@@ -1,9 +1,25 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <thread>
+#include "ws_server.h"
+
+void start_server()
+{
+    const auto address = boost::asio::ip::tcp::v4(); // net::ip::make_address(argAddr);
+    const uint16_t port = 7654;
+
+    Server server(tcp::endpoint(address, port));
+
+    server.run();
+}
 
 int main(void)
 {
+    std::thread server(start_server);
+
+    server.detach();
+
     GLFWwindow* window;
     int exit_code = 0;
 

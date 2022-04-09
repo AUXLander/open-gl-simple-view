@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script language="javascript" type="text/javascript">
+"use strict";
+var output;
+var ws;
+
+window.addEventListener('load', () => {
+    let wsUri = 'ws://' + window.location.hostname+ ':7654';
+
+    output = document.getElementById("output");
+
+    ws = new WebSocket(wsUri);
+    ws.onopen = () => {
+        writeToScreen('CONNECTED', output);
+        doSend('WebSocket rocks!');
+    };
+    
+    ws.onclose = () => writeToScreen('<p style="color: red;">DISCONNECTED</p>');
+    ws.onmessage = msg => writeToScreen('<p style="color: blue;">RESPONSE: ' + msg.data + '</p>');
+    ws.onerror = msg => writeToScreen('<p style="color: red;">ERROR: ' + msg.data + '</p>');
+
+}, false);
+
+function writeToScreen(message) {
+
+    console.log(message);
+
+    return
+
+    let p = document.createElement('p');
+    p.style.wordWrap = 'break-word';
+    p.innerHTML = message;
+
+    // if (output.childNodes.length > 5) {
+    //     output.removeChild(output.childNodes[0]);
+    // }
+
+    output.appendChild(p);
+}
+
+function doSend(message) {
+    ws.send(message);
+}
+
+function wsSendBinary() {
+    const array = new Float32Array(5);
+
+    for (var i = 0; i < array.length; ++i) {
+        array[i] = i / 2;
+    }
+
+    doSend(array);
+}
+
+</script>
+</head>
+<body style="font-family: sans-serif; font-size: 1.5em">
+    <h1>Echo</h1>
+
+    <button onClick="doSend('left')">left</button>
+    <button onClick="doSend('right')">right</button>
+    
+    <button onClick="doSend('top')">top</button>
+    <button onClick="doSend('bottom')">bottom</button>
+
+    <input style="font-size: 1.3em" type="text" id="data_to_send" value="hello"></input>
+
+    <div id="output"></div>
+</body>
+</html>
