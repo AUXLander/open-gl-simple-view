@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23.0 FATAL_ERROR)
 
-set(PROJECT_NAME simple-view)
+set(PROJECT_NAME mcml-view)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)

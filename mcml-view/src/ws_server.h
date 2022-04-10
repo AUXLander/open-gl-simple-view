@@ -1,8 +1,15 @@
 #include <iostream>
 
+#ifdef _MSC_VER
+#include <boost/config/compiler/visualc.hpp>
+#endif
+
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/ip/tcp.hpp>
+
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
 #include <cstdlib>
 #include <functional>
@@ -14,6 +21,8 @@
 #include <deque>
 #include <chrono>
 #include <cassert>
+
+#include "gl_draw.h"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -32,6 +41,9 @@ struct packet
 
 using shared_packet = std::shared_ptr<packet>;
 
+
+static explorer* explorer_ptr {nullptr};
+
 class Session : public std::enable_shared_from_this<Session>
 {
 public:
@@ -47,7 +59,8 @@ public:
             [](websocket::response_type& res)
             {
                 res.set(http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + "ws-server");
-            }));
+            })
+        );
 
         std::cout << "Created session " << m_id << '\n';
     }
@@ -90,6 +103,7 @@ public:
             rpacket->text = true;
             auto data = reinterpret_cast<const char*>(m_readBuf.cdata().data());
             rpacket->textBuffer.assign(data, data + m_readBuf.size());
+
             onReceive(rpacket);
         }
 
@@ -99,9 +113,37 @@ public:
 
     void onReceive(const shared_packet& packet)
     {
+        std::stringstream ssjson(packet->textBuffer);
+
+        boost::property_tree::ptree pt;
+        boost::property_tree::read_json(ssjson, pt); 
+
+        const auto dcommand = pt.get_child_optional("command");
+        const auto dvalue   = pt.get_child_optional("value");
+
+        if (explorer_ptr && dcommand && dvalue)
+        {
+            const auto command = dcommand.get().get_value<std::string>();
+            const auto value   = dvalue.get().get_value<std::string>();
+
+            std::cout << "command : " << command << '\n';
+            std::cout << "value   : " << value << '\n';
+
+            if (command == "min_layer")
+            {
+                explorer_ptr->min_layer = (size_t)std::stoull(value);
+                explorer_ptr->index = 0;
+            }
+            else if (command == "max_layer")
+            {
+                explorer_ptr->max_layer = (size_t)std::stoull(value);
+                explorer_ptr->index = 0;
+            }
+        }
+
         std::cout << "Received: " << packet->textBuffer << '\n';
-        // echo
-        send(packet);
+
+        //send(packet);
     }
 
     void send(const shared_packet& packet)
@@ -159,7 +201,7 @@ public:
     Server(tcp::endpoint endpoint) : 
         m_context(1),
         m_acceptor(m_context, endpoint)
-    {}
+    {;}
 
     int run()
     {
@@ -195,10 +237,12 @@ private:
 };
 
 
-void start_server()
+void start_server(explorer* ex)
 {
     const auto address = boost::asio::ip::tcp::v4(); // net::ip::make_address(argAddr);
     const uint16_t port = 7654;
+
+    explorer_ptr = ex;
 
     Server server(tcp::endpoint(address, port));
 

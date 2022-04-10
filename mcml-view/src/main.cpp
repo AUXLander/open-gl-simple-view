@@ -7,14 +7,17 @@
 
 #include <iostream>
 #include <thread>
+#include <chrono>
 
 #include "gl_draw.h"
 
 int main(void)
 {
-    std::thread server(start_server);
+    explorer ex;
 
-    //server.detach();
+    std::thread server(start_server, &ex);
+
+    server.detach();
 
     GLFWwindow* window;
     int exit_code = 0;
@@ -40,9 +43,6 @@ int main(void)
             std::cout << "Render device: " << glGetString(GL_RENDERER) << '\n';
             std::cout << "OpenGL " << GLVersion.major << "." << GLVersion.minor << '\n';
 
-
-            explorer ex;
-
             ex.init(800, 800);
 
             ex.set_file("F:\\UserData\\Projects\\LightTransport\\mcml\\BINARY_DATA.BIN");
@@ -56,18 +56,15 @@ int main(void)
             /* Loop until the user closes the window */
             while (!glfwWindowShouldClose(window))
             {
-                /* Render here */
-                glClear(GL_COLOR_BUFFER_BIT);
-
+                /* Poll for and process events */
+                glfwPollEvents();
 
                 ex.DrawTexture();
-
 
                 /* Swap front and back buffers */
                 glfwSwapBuffers(window);
 
-                /* Poll for and process events */
-                glfwPollEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         }
         else {

@@ -57,6 +57,9 @@ public:
 
     int index = 0;
 
+    size_t min_layer = 0;
+    size_t max_layer = 0xffff;
+
     std::unique_ptr<pixel> texture;
 
     void init(int ViewWidth, int ViewHeight)
@@ -159,7 +162,7 @@ public:
         }
     }
 
-    void render_frame(size_t min_layer = 0, size_t max_layer = 5)
+    void render_frame()
     {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_BLEND);
