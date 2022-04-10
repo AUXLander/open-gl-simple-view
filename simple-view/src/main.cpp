@@ -3,22 +3,13 @@
 #include <iostream>
 #include <thread>
 #include "ws_server.h"
-
-void start_server()
-{
-    const auto address = boost::asio::ip::tcp::v4(); // net::ip::make_address(argAddr);
-    const uint16_t port = 7654;
-
-    Server server(tcp::endpoint(address, port));
-
-    server.run();
-}
+#include "gl_draw.h"
 
 int main(void)
 {
     std::thread server(start_server);
 
-    server.detach();
+    //server.detach();
 
     GLFWwindow* window;
     int exit_code = 0;
@@ -42,13 +33,22 @@ int main(void)
             std::cout << "Render device: " << glGetString(GL_RENDERER) << '\n';
             std::cout << "OpenGL " << GLVersion.major << "." << GLVersion.minor << '\n';
 
-            glClearColor(0, 1, 0, 1);
+
+            explorer ex;
+
+            ex.init();
+
+            glClearColor(1, 1, 1, 1);
 
             /* Loop until the user closes the window */
             while (!glfwWindowShouldClose(window))
             {
                 /* Render here */
                 glClear(GL_COLOR_BUFFER_BIT);
+
+
+                ex.DrawTexture();
+
 
                 /* Swap front and back buffers */
                 glfwSwapBuffers(window);

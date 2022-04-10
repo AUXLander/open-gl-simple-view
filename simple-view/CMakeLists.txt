@@ -12,7 +12,9 @@ set(EXTERNALS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/external)
 project(${PROJECT_NAME})
 
 # simple open gl view
-add_executable(${PROJECT_NAME} src/main.cpp src/ws_server.h)
+add_executable(${PROJECT_NAME} src/main.cpp 
+					 src/ws_server.h
+					 src/gl_draw.h)
 
 # boost
 include_directories(${EXTERNALS_SOURCE_DIR}/boost)

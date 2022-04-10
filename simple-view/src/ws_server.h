@@ -193,3 +193,14 @@ private:
     net::io_context m_context;
     tcp::acceptor m_acceptor;
 };
+
+
+void start_server()
+{
+    const auto address = boost::asio::ip::tcp::v4(); // net::ip::make_address(argAddr);
+    const uint16_t port = 7654;
+
+    Server server(tcp::endpoint(address, port));
+
+    server.run();
+}
