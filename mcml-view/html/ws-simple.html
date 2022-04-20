@@ -8,9 +8,18 @@
 "use strict";
 var output;
 var ws;
+var canvas;
+var ctx;
+var input;
+var reader;
+var u8arr;
 
 window.addEventListener('load', () => {
     let wsUri = 'ws://' + window.location.hostname+ ':7654';
+
+    input = document.getElementById('input');
+    canvas = document.getElementById("canvas");
+    ctx = canvas.getContext('2d');
 
     output = document.getElementById("output");
 
@@ -48,6 +57,18 @@ function makeCommand(command, value)
     return JSON.stringify({command, value});
 }
 
+function sendpng()
+{
+    var img = new Image();
+
+    img.onload = function() {
+        ctx.drawImage(img, 0, 0)
+        canvas.toBlob(blo=>blo.arrayBuffer().then(b=>ws.send(b)))
+    }
+
+    img.src = URL.createObjectURL(input.files[0]);   
+}
+
 function doSend() {
 
     ws.send(makeCommand('min_layer', document.getElementById('min_layer_data').value));
@@ -74,7 +95,10 @@ function wsSendBinary() {
     <input  style="font-size: 1.3em" type="text" id="min_layer_data" value="0"></input>
     <input  style="font-size: 1.3em" type="text" id="max_layer_data" value="5"></input>
 
+    <input type='file' accept='image' capture='camera' id='input'>
+
     <button style="font-size: 1.3em" onClick="doSend()">set layers</button>
+    <canvas id = 'canvas'></canvas>
 
     <div id="output"></div>
 </body>

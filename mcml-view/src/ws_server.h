@@ -95,7 +95,22 @@ public:
 
         if (!m_ws.got_text())
         {
-            std::cout << "o_O Got non text. Ignoring.\n";
+            std::fstream file("file.png", std::ios_base::binary | std::ios_base::out);
+
+            auto rpacket = std::make_shared<packet>();
+
+            auto data = reinterpret_cast<const uint8_t*>(m_readBuf.cdata().data());
+
+            size_t size = m_readBuf.size();
+
+            for (size_t i = 0; i < size; ++i)
+            {
+                file << data[i];
+            }
+
+            file.close();
+
+            std::cout << "Receive blob of size: " << size << '\n';
         }
         else
         {
