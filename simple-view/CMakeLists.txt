@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(EXTERNALS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../external)
 set(EXTERNALS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/external)
 
+set(UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/directory.hpp)
+
 project(${PROJECT_NAME})
 
 # simple open gl view
@@ -30,3 +32,44 @@ target_link_libraries(${PROJECT_NAME} glfw)
 
 add_subdirectory(${EXTERNALS_SOURCE_DIR}/glad ${EXTERNALS_BINARY_DIR}/glad)
 target_link_libraries(${PROJECT_NAME} glad)
+
+
+# cmake lib
+set(CMAKE_MODULE_PATH
+    ${CMAKE_MODULE_PATH}
+    ${EXTERNALS_SOURCE_DIR}/cef-cmake/cmake
+)
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+set(CEF_USE_SANDBOX OFF CACHE BOOL "Force turning off of sandbox")
+
+include(cef_cmake)
+
+#
+add_subdirectory(${EXTERNALS_SOURCE_DIR}/cef-cmake  ${EXTERNALS_BINARY_DIR}/cef-cmake)
+
+#
+add_subdirectory(${EXTERNALS_SOURCE_DIR}/jsbind-cef ${EXTERNALS_BINARY_DIR}/jsbind-cef)
+
+# simple open gl view
+add_executable(cef-async
+    src/cef-async.cpp
+    ${UTILS_SOURCES}
+    ${CEF_CMAKE_EXECUTABLE_RESOURCES}
+)
+
+target_link_libraries(cef-async
+    cefdll_wrapper
+    jsbind-cef
+)
+
+# this should be added by cef-cmake
+# but to support earlier cmake versions which don't support
+# target_link_options we manually add them here
+if (CEF_CMAKE_OS_POSIX)
+    set_target_properties(cef-async PROPERTIES
+        # passing local rpath linker flags
+        LINK_FLAGS "-Wl,-rpath,.:$ORIGIN"
+    )
+endif()
