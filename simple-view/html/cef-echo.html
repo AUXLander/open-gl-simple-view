@@ -6,10 +6,18 @@
 var output;
 var ws;
 var Module;
+var canvas;
+var ctx;
+var input;
+
+
 
 function init() {
     output = document.getElementById("output");
-
+    input  = document.getElementById('input');
+	canvas = document.getElementById("canvas");
+	ctx    = canvas.getContext('2d');
+		
     if (Module)
     {
         Module.setReceiveStringData(onReceive);
@@ -54,6 +62,35 @@ function wsSendBinary() {
 
     Module.sendBinary(array);
 }
+
+function sendpng()
+{
+    var img = new Image();
+
+    img.onload = function() {
+        ctx.drawImage(img, 0, 0)
+
+        canvas.toBlob(blo => {
+
+            var buf = blo.arrayBuffer();
+
+            alert(buf)
+
+            buf.then(
+                resolve => {
+                    Module.sendBinary(new Uint8Array(resolve))
+                }, 
+                reason => {
+                    alert(reason)
+                }
+            )
+
+        }, 'image/jpeg', 0.95)
+    }
+
+    img.src = URL.createObjectURL(input.files[0]);   
+}
+
 </script>
 </head>
 <body style="font-family: sans-serif; font-size: 1.5em">
@@ -62,6 +99,13 @@ function wsSendBinary() {
     <input style="font-size: 1.3em" type="text" id="data_to_send" value="hello"></input>
     <button style="font-size: 1.3em" id="sender" onClick="wsSend()">Send</button>
     <button style="font-size: 1.3em" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
+	
+	
+	<input type='file' accept='image' capture='camera' id='input'>
+	<button style="font-size: 1.3em" id="sender_binary" onClick="sendpng()">Send picture</button>
+
+	<canvas id = 'canvas'></canvas>
+
 
     <div id="output"></div>
 </body>

@@ -172,12 +172,15 @@ void receiveBinary(jsbind::local v)
 	auto data = jsvec.data();
 	auto size = jsvec.size();
 
-	CefRefPtr<CefBinaryValue> binary(CefBinaryValue::Create(data, size));
+	if (data)
+	{
+		CefRefPtr<CefBinaryValue> binary(CefBinaryValue::Create(data, size));
 
-	msg->GetArgumentList()->SetBinary(0, binary);
-	msg->GetArgumentList()->SetSize(size);
+		msg->GetArgumentList()->SetBinary(0, binary);
+		msg->GetArgumentList()->SetSize(size);
 
-	CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+		CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+	}
 }
 
 void receiveString(jsbind::local v)

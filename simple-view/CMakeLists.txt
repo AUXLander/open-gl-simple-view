@@ -42,6 +42,8 @@ set(CMAKE_MODULE_PATH
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+set(CEF_VERSION "92.0.27+g274abcf+chromium-92.0.4515.159")
+
 set(CEF_USE_SANDBOX OFF CACHE BOOL "Force turning off of sandbox")
 
 include(cef_cmake)
