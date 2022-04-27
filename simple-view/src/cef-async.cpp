@@ -14,6 +14,9 @@
 #include <iostream>
 #include <variant>
 
+#include <fstream>
+
+volatile uint8_t* global_buffer{0};
 
 #define URI_ROOT "http://localhost:8000"
 //const char* const URL = URI_ROOT "/cef-echo.html";
@@ -206,6 +209,14 @@ JSBIND_BINDINGS(App)
 	jsbind::function("setReceiveBinaryData", setReceiveBinaryData);
 }
 
+class ReleaseCallback : public CefV8ArrayBufferReleaseCallback {
+public:
+	void ReleaseBuffer(void* buffer) override {
+		std::free(buffer);
+	}
+	IMPLEMENT_REFCOUNTING(ReleaseCallback);
+};
+
 class RendererApp : public CefApp, public CefRenderProcessHandler
 {
 public:
@@ -250,18 +261,15 @@ public:
 			auto binary = args->GetBinary(0);
 			auto size = args->GetSize();
 
-			std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
+			uint8_t* buffer = new uint8_t[size];
 
-			auto data = binary->GetData(&buffer[0], size, 0);
+			//std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
+
+			auto data = binary->GetData(buffer, size, 0);
 
 			jsbind::enter_context();
 
-			auto jsarr = jsbind::local(CefV8Value::CreateArray(size));
-
-			for (int i = 0; i < size; ++i)
-			{
-				jsarr.set(i, buffer[i]);
-			}
+			auto jsarr = jsbind::local(CefV8Value::CreateArrayBuffer(buffer, size, new ReleaseCallback()));
 			
 			jsOnReceiveBinaryData.to_local()(jsarr);
 
@@ -334,7 +342,24 @@ int main(int argc, char* argv[])
 	client->set_callback_binary(
 		[&](auto frame, auto data, size_t size) 
 		{
-			client->send_binary(frame, std::move(data), size);
+			std::ifstream file("D:\\file.png", std::ios_base::binary );
+
+			if (file.is_open())
+			{
+				size_t size = file.tellg();
+
+				file.seekg(0, std::ios::end);
+
+				size = (size_t)file.tellg() - size;
+
+				file.seekg(0, std::ios::beg);
+
+				data.reset(new uint8_t[size]{0});
+
+				file.read((char*)data.get(), size);
+
+				client->send_binary(frame, std::move(data), size);
+			}
 		}
 	);
 

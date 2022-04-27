@@ -2,14 +2,14 @@
 <html>
 <head>
 <script language="javascript" type="text/javascript">
-"use strict";
+//"use strict";
 var output;
 var ws;
 var Module;
 var canvas;
 var ctx;
 var input;
-
+var img;
 
 
 function init() {
@@ -38,7 +38,20 @@ function writeToScreen(message) {
 
 function onReceive(message) 
 {
-    writeToScreen('<span style="color: blue;">RESPONSE: ' + JSON.stringify(message) + '</span>');
+    writeToScreen('<span style="color: blue;">RESPONSE: ' + message.constructor.name + '</span>');
+
+    var blob = new Blob([new Uint8Array(message).buffer], { type : 'image/png' });
+
+    var img = new Image();
+
+    //img.width = 640;
+    //img.height = 640;
+
+    img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+    };
+
+    img.src = URL.createObjectURL(blob);
 }
 
 function doSend(message) {
@@ -88,7 +101,7 @@ function sendpng()
         }, 'image/jpeg', 0.95)
     }
 
-    img.src = URL.createObjectURL(input.files[0]);   
+    img.src = URL.createObjectURL(input.files[0]);
 }
 
 </script>
@@ -104,7 +117,7 @@ function sendpng()
 	<input type='file' accept='image' capture='camera' id='input'>
 	<button style="font-size: 1.3em" id="sender_binary" onClick="sendpng()">Send picture</button>
 
-	<canvas id = 'canvas'></canvas>
+	<canvas id='canvas' width="640" height="640"></canvas>
 
 
     <div id="output"></div>
