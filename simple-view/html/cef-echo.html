@@ -1,8 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
 <script language="javascript" type="text/javascript">
-//"use strict";
+"use strict";
 var output;
 var ws;
 var Module;
@@ -20,8 +24,8 @@ function init() {
 		
     if (Module)
     {
-        Module.setReceiveStringData(onReceive);
-        Module.setReceiveBinaryData(onReceive);
+        Module.setReceiveStringData(onReceiveString);
+        Module.setReceiveBinaryData(onReceiveBinary);
     }
 }
 
@@ -36,22 +40,26 @@ function writeToScreen(message) {
     output.appendChild(p);
 }
 
-function onReceive(message) 
+function onReceiveBinary(message)
 {
     writeToScreen('<span style="color: blue;">RESPONSE: ' + message.constructor.name + '</span>');
 
-    var blob = new Blob([new Uint8Array(message).buffer], { type : 'image/png' });
-
-    var img = new Image();
-
-    //img.width = 640;
-    //img.height = 640;
+    img = new Image();
 
     img.onload = () => {
         ctx.drawImage(img, 0, 0);
     };
 
-    img.src = URL.createObjectURL(blob);
+    const promise = new Promise((resolve, reject) => {
+        resolve(new Blob([new Uint8Array(message).buffer], { type : 'image/png' }))
+    });
+
+    promise.then(blob => img.src = URL.createObjectURL(blob));
+}
+
+function onReceiveString(message) 
+{
+    writeToScreen('<span style="color: blue;">RESPONSE: ' + message + '</span>');
 }
 
 function doSend(message) {
@@ -76,46 +84,42 @@ function wsSendBinary() {
     Module.sendBinary(array);
 }
 
-function sendpng()
-{
-    var img = new Image();
-
-    img.onload = function() {
-        ctx.drawImage(img, 0, 0)
-
-        canvas.toBlob(blo => {
-
-            var buf = blo.arrayBuffer();
-
-            alert(buf)
-
-            buf.then(
-                resolve => {
-                    Module.sendBinary(new Uint8Array(resolve))
-                }, 
-                reason => {
-                    alert(reason)
-                }
-            )
-
-        }, 'image/jpeg', 0.95)
-    }
-
-    img.src = URL.createObjectURL(input.files[0]);
-}
-
 </script>
+<style>
+    * { outline: 0 !important; }
+</style>
 </head>
 <body style="font-family: sans-serif; font-size: 1.5em">
-    <h1>Echo</h1>
+    <h1>IPC send image</h1>
 
-    <input style="font-size: 1.3em" type="text" id="data_to_send" value="hello"></input>
-    <button style="font-size: 1.3em" id="sender" onClick="wsSend()">Send</button>
-    <button style="font-size: 1.3em" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
+    <div class="container-fluid">
+        <div class="row" style="max-width: 500px; margin: 0 auto; ">
+            <form onsubmit="return false" >
+                <div class="form-group">
+                  <label for="exampleInputEmail1">Data to send</label>
+                  <div class="row" style="display: flex; flex-direction: row;">
+                    <input class="form-control" type="text" id="data_to_send" value="hello"></input>
+                    <button class="btn btn-default" id="sender" onClick="wsSend()">Send</button>
+                  </div>
+
+                </div>
+            </form>
+
+
+        </div>
+      </div>
+
+
+
+
+
+    
+    
+    <button class="btn btn-default" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
 	
 	
-	<input type='file' accept='image' capture='camera' id='input'>
-	<button style="font-size: 1.3em" id="sender_binary" onClick="sendpng()">Send picture</button>
+	<input class="form-control"  type='file' accept='image' capture='camera' id='input'>
+	<button class="btn btn-default" id="sender_binary" onClick="sendpng()">Send picture</button>
 
 	<canvas id='canvas' width="640" height="640"></canvas>
 
