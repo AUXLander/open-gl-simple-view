@@ -18,7 +18,6 @@ struct buffer
 
 	~buffer()
 	{
-		std::cout << "destruct " << size << '\n';
 		data.reset(nullptr);
 	}
 

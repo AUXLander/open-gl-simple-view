@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
 		"onString",
 		
 		// function to process strings
-		[&client](auto &&msg, auto &&text) -> void {
+		[&client](CefRefPtr<CefProcessMessage> msg, std::string &&text) -> void {
 
 			msg->GetArgumentList()->SetString(0, std::move(text));
 
@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
 		"onBinary",
 
 		// function to process buffer
-		[&client](auto msg, auto &&buffer) -> void {
+		[&client](CefRefPtr<CefProcessMessage> msg, buffer<uint8_t> &&buffer) -> void {
 
 			auto binary = CefBinaryValue::Create(buffer.data.get(), buffer.size);
 

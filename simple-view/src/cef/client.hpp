@@ -67,13 +67,11 @@ public:
 	}
 };
 
-template<class T, class ArgumentList>
+template<class T, class ArgumentList, class function, class resolver>
 struct callback : public callback_base<ArgumentList>
 {
 	using argslist = typename ArgumentList;
 	using argument = typename T;
-	using resolver = std::function<argument(argslist)>;
-	using function = std::function<void(CefRefPtr<CefProcessMessage> msg, argument&&)>;
 
 private:
 	function __fnc;
@@ -81,13 +79,13 @@ private:
 	argument __arg;
 
 public:
-	callback(const char* name, function&& f, resolver&& r) :
+	callback(const char* name, function f, resolver r) :
 		callback_base<ArgumentList>(name),
-		__fnc{ std::move(f) }, __rsl{ std::move(r) }
+		__fnc{ f }, __rsl{ r }
 	{;}
 
-	callback(callback<T, ArgumentList>&&) = default;
-	callback(const callback<T, ArgumentList>&) = default;
+	callback(callback<T, ArgumentList, function, resolver>&&) = default;
+	callback(const callback<T, ArgumentList, function, resolver>&) = default;
 
 	virtual void resolve_argument_list(argslist args) override
 	{
@@ -111,8 +109,8 @@ struct MinimalClient : public CefClient, public CefLifeSpanHandler, public CefRe
 {
 	using callback_base_arguments = CefRefPtr<CefListValue>;
 
-	template<class T>
-	using callback_t = typename callback<T, callback_base_arguments>;
+	template<class T, class function, class resolver>
+	using callback_t = typename callback<T, callback_base_arguments, function, resolver>;
 
 	using buffer_t = buffer<uint8_t>;
 	using callback_base_t = callback_base<callback_base_arguments>;
@@ -143,10 +141,10 @@ public:
 		return client;
 	}
 
-	template<class T>
-	void register_callback(const char* name, typename callback_t<T>::function&& f, typename callback_t<T>::resolver&& r)
+	template<class T, class function, class resolver>
+	void register_callback(const char* name, function f, resolver r)
 	{
-		__cbstorage.emplace(name, new callback_t<T>{ name, std::move(f), std::move(r) });
+		__cbstorage.emplace(name, new callback<T, callback_base_arguments, function, resolver>(name, f, r));
 	}
 
 	void send(CefRefPtr<CefProcessMessage> message) const
