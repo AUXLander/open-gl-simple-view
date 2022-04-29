@@ -2,12 +2,11 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <thread>
-#include "ws_server.h"
 #include "gl_draw.h"
 
 int main(void)
 {
-    std::thread server(start_server);
+    //std::thread server(start_server);
 
     //server.detach();
 

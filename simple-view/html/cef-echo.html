@@ -42,19 +42,25 @@ function writeToScreen(message) {
 
 function onReceiveBinary(message)
 {
-    writeToScreen('<span style="color: blue;">RESPONSE: ' + message.constructor.name + '</span>');
+    switch(message.command)
+    {
+        case "onBinary": 
+        {
+            writeToScreen('<span style="color: blue;">RESPONSE: ' + message.command + '</span>');
 
-    img = new Image();
+            img = new Image();
 
-    img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-    };
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0);
+            };
 
-    const promise = new Promise((resolve, reject) => {
-        resolve(new Blob([new Uint8Array(message).buffer], { type : 'image/png' }))
-    });
+            const promise = new Promise((resolve, reject) => {
+                resolve(new Blob([new Uint8Array(message).buffer], { type : 'image/bmp' }))
+            });
 
-    promise.then(blob => img.src = URL.createObjectURL(blob));
+            promise.then(blob => img.src = URL.createObjectURL(blob));
+        }
+    }
 }
 
 function onReceiveString(message) 

@@ -1,294 +1,10 @@
-#include <cef_cmake/disable_warnings.h>
-#include <include/cef_app.h>
-#include <include/cef_client.h>
-#include <include/wrapper/cef_resource_manager.h>
-#include <cef_cmake/reenable_warnings.h>
-
-#include "utils/directory.hpp"
-
-#include <jsbind.hpp>
+#include "cef/client.hpp"
+#include "cef/render.hpp"
 
 #include <string>
 #include <vector>
 #include <cassert>
 #include <iostream>
-#include <variant>
-#include <thread>
-#include <chrono>
-
-#include <fstream>
-
-#define URI_ROOT "http://localhost:8000"
-//const char* const URL = URI_ROOT "/cef-echo.html";
-const char* const URL = "file:///F:/UserData/Projects/open-gl-simple-view/simple-view/html/cef-echo.html";
-
-void setupResourceManagerDirectoryProvider(CefRefPtr<CefResourceManager> resource_manager, std::string uri, std::string dir)
-{
-	if (!CefCurrentlyOn(TID_IO)) 
-	{
-		// Execute on the browser IO thread.
-		CefPostTask(TID_IO, base::Bind(&setupResourceManagerDirectoryProvider, resource_manager, uri, dir));
-		return;
-	}
-
-	resource_manager->AddDirectoryProvider(uri, dir, 1, dir);
-}
-
-// this is only needed so we have a way to break the message loop
-struct MinimalClient : public CefClient, public CefLifeSpanHandler, public CefRequestHandler, public CefResourceRequestHandler
-{
-	template<class T>
-	using callback = std::function<void(CefRefPtr<CefFrame>, T&&)>;
-
-	CefRefPtr<CefBrowser> bro;
-
-public:
-	MinimalClient() : 
-		m_resourceManager(new CefResourceManager)
-	{
-		auto exePath = DirUtil::getCurrentExecutablePath();
-		auto assetPath = DirUtil::getAssetPath(exePath, "html");
-
-		setupResourceManagerDirectoryProvider(m_resourceManager, URI_ROOT, assetPath);
-	}
-
-	void set_callback_string(std::function<void(CefRefPtr<CefFrame>, std::string&&)>&& f)
-	{
-		callback_string.reset(new std::function<void(CefRefPtr<CefFrame>, std::string&&)>(f));
-	}
-
-	void set_callback_binary(std::function<void(CefRefPtr<CefFrame>, std::unique_ptr<uint8_t[]>&&, size_t)>&& f)
-	{
-		callback_binary.reset(new std::function<void(CefRefPtr<CefFrame>, std::unique_ptr<uint8_t[]>&&, size_t)>(f));
-	}
-
-	void send_string(std::string&& text) const
-	{
-		send_string(bro->GetMainFrame(), std::move(text));
-	}
-
-	void send_string(CefRefPtr<CefFrame> frame, std::string&& text) const
-	{
-		auto msg = CefProcessMessage::Create("onString");
-
-		msg->GetArgumentList()->SetString(0, text);
-
-		frame->SendProcessMessage(PID_RENDERER, msg);
-	}
-
-	void send_binary(std::unique_ptr<uint8_t[]>&& data, size_t size) const
-	{
-		send_binary(bro->GetMainFrame(), std::move(data), size);
-	}
-
-	void send_binary(CefRefPtr<CefFrame> frame, std::unique_ptr<uint8_t[]>&& data, size_t size) const
-	{
-		auto msg = CefProcessMessage::Create("onBinary");
-
-		CefRefPtr<CefBinaryValue> binary(CefBinaryValue::Create(data.get(), size));
-
-		msg->GetArgumentList()->SetSize(size);
-		msg->GetArgumentList()->SetBinary(0, binary);
-
-		frame->SendProcessMessage(PID_RENDERER, msg);
-	}
-
-private:
-	std::unique_ptr<callback<std::string>> callback_string;
-	std::unique_ptr<std::function<void(CefRefPtr<CefFrame>, std::unique_ptr<uint8_t[]>&&, size_t)>> callback_binary;
-
-	CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
-	CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
-
-	void OnBeforeClose(CefRefPtr<CefBrowser>) override
-	{
-		CefQuitMessageLoop();
-	}
-
-	CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefRefPtr<CefRequest>, bool is_navigation, bool is_download, const CefString& request_initiator, bool& disable_default_handling) override 
-	{ 
-		return this; 
-	}
-
-	cef_return_value_t OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, CefRefPtr<CefRequestCallback> callback) override 
-	{
-		return m_resourceManager->OnBeforeResourceLoad(browser, frame, request, callback);
-	}
-
-	CefRefPtr<CefResourceHandler> GetResourceHandler(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request) override 
-	{
-		return m_resourceManager->GetResourceHandler(browser, frame, request);
-	}
-
-	bool OnProcessMessageReceived(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, CefProcessId /*source_process*/, CefRefPtr<CefProcessMessage> message) override
-	{
-		auto name = message->GetName();
-		auto args = message->GetArgumentList();
-
-		if (callback_string && name == "onString")
-		{
-			auto text = args->GetString(0).ToString();
-
-			(*callback_string)(frame, std::move(text));
-
-			return true;
-		}
-		else if (callback_binary && name == "onBinary")
-		{
-			auto binary = args->GetBinary(0);
-			auto size = args->GetSize();
-
-			std::unique_ptr<uint8_t[]> buffer(new uint8_t[size]);
-
-			binary->GetData(&buffer[0], size, 0);
-
-			(*callback_binary)(frame, std::move(buffer), size);
-
-			return true;
-		}
-
-		return false;
-	}
-
-private:
-	CefRefPtr<CefResourceManager> m_resourceManager;
-
-	IMPLEMENT_REFCOUNTING(MinimalClient);
-	DISALLOW_COPY_AND_ASSIGN(MinimalClient);
-};
-
-jsbind::persistent jsOnReceiveStringData;
-jsbind::persistent jsOnReceiveBinaryData;
-
-void setReceiveStringData(jsbind::local func)
-{
-	jsOnReceiveStringData.reset(func);
-}
-
-void setReceiveBinaryData(jsbind::local func)
-{
-	jsOnReceiveBinaryData.reset(func);
-}
-
-void receiveBinary(jsbind::local v)
-{
-	auto msg = CefProcessMessage::Create("onBinary");
-
-	auto jsvec = jsbind::vecFromJSArray<uint8_t>(v);
-
-	auto data = jsvec.data();
-	auto size = jsvec.size();
-
-	if (data)
-	{
-		CefRefPtr<CefBinaryValue> binary(CefBinaryValue::Create(data, size));
-
-		msg->GetArgumentList()->SetBinary(0, binary);
-		msg->GetArgumentList()->SetSize(size);
-
-		CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
-	}
-}
-
-void receiveString(jsbind::local v)
-{
-	auto msg = CefProcessMessage::Create("onString");
-
-	auto jsstr = v.as<std::string>();
-
-	auto data = jsstr.data();
-	auto size = jsstr.size();
-
-	msg->GetArgumentList()->SetString(0, jsstr);
-	msg->GetArgumentList()->SetSize(size);
-
-	CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
-}
-
-JSBIND_BINDINGS(App)
-{
-	jsbind::function("sendString", receiveString);
-	jsbind::function("sendBinary", receiveBinary);
-
-	jsbind::function("setReceiveStringData", setReceiveStringData);
-	jsbind::function("setReceiveBinaryData", setReceiveBinaryData);
-}
-
-class ReleaseCallback : public CefV8ArrayBufferReleaseCallback {
-public:
-	void ReleaseBuffer(void* buffer) override {
-		std::free(buffer);
-	}
-	IMPLEMENT_REFCOUNTING(ReleaseCallback);
-};
-
-class RendererApp : public CefApp, public CefRenderProcessHandler
-{
-public:
-	RendererApp() = default;
-
-	CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override
-	{
-		return this;
-	}
-
-	void OnContextCreated(CefRefPtr<CefBrowser> /*browser*/, CefRefPtr<CefFrame> /*frame*/, CefRefPtr<CefV8Context> /*context*/) override
-	{
-		jsbind::initialize();
-	}
-
-	void OnContextReleased(CefRefPtr<CefBrowser> /*browser*/, CefRefPtr<CefFrame> /*frame*/, CefRefPtr<CefV8Context> /*context*/) override
-	{
-		jsbind::enter_context();
-		jsOnReceiveStringData.reset();
-		jsOnReceiveBinaryData.reset();
-		jsbind::exit_context();
-		jsbind::deinitialize();
-	}
-
-	bool OnProcessMessageReceived(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefProcessId /* source proccess */, CefRefPtr<CefProcessMessage> message) override
-	{
-		auto name = message->GetName();
-		auto args = message->GetArgumentList();
-
-		if (name == "onString")
-		{
-			auto data = args->GetString(0).ToString();
-			std::cout << data << std::endl;
-
-			jsbind::enter_context();
-			jsOnReceiveStringData.to_local()(data);
-			jsbind::exit_context();
-
-			return true;
-		}
-		else if (name == "onBinary")
-		{
-			auto binary = args->GetBinary(0);
-			auto size = args->GetSize();
-
-			if (size)
-			{
-				uint8_t* buffer = new uint8_t[size];
-
-				binary->GetData(buffer, size, 0);
-
-				jsbind::enter_context();
-
-				jsOnReceiveBinaryData.to_local()(jsbind::local(CefV8Value::CreateArrayBuffer(buffer, size, new ReleaseCallback())));
-
-				jsbind::exit_context();
-			}
-
-			return true;
-		}
-
-		return false;
-	}
-private:
-	IMPLEMENT_REFCOUNTING(RendererApp);
-	DISALLOW_COPY_AND_ASSIGN(RendererApp);
-};
 
 int main(int argc, char* argv[])
 {
@@ -342,12 +58,52 @@ int main(int argc, char* argv[])
 #endif
 	CefBrowserSettings browserSettings;
 
-	CefRefPtr<MinimalClient> client(new MinimalClient);
+	auto client = MinimalClient::CreateBrowserSync(windowInfo, URL, browserSettings, nullptr, nullptr);
 
-	client->set_callback_binary(
-		[&](auto frame, auto data, size_t size) 
-		{
-			std::ifstream file("D:\\file.png", std::ios_base::binary );
+	client->register_callback<std::string>(
+		// name of method to bind
+		"onString",
+		
+		// function to process strings
+		[&client](auto &&msg, auto &&text) -> void {
+
+			msg->GetArgumentList()->SetString(0, std::move(text));
+
+			client->send(msg);
+		}, 
+
+		// function to resolve argument lists
+		[](auto arglist) -> std::string {
+			return arglist->GetString(0).ToString();
+		}
+	);
+
+	client->register_callback<buffer<uint8_t>>(
+		// name of method to bind
+		"onBinary",
+
+		// function to process buffer
+		[&client](auto msg, auto &&buffer) -> void {
+
+			auto binary = CefBinaryValue::Create(buffer.data.get(), buffer.size);
+
+			msg->GetArgumentList()->SetSize(buffer.size);
+			msg->GetArgumentList()->SetBinary(0, binary);
+
+			client->send(msg);
+		},
+
+		// function to resolve argument lists
+		[](auto arglist) -> buffer<uint8_t> {
+
+			auto binary = arglist->GetBinary(0);
+			auto size = arglist->GetSize();
+
+			buffer<uint8_t> buf(size);
+
+			binary->GetData(buf.data.get(), size, 0);
+
+			std::ifstream file("D:\\file.bmp", std::ios_base::binary);
 
 			if (file.is_open())
 			{
@@ -359,25 +115,18 @@ int main(int argc, char* argv[])
 
 				file.seekg(0, std::ios::beg);
 
-				data.reset(new uint8_t[size]{0});
+				buffer<uint8_t> buffer(size);
 
-				file.read((char*)data.get(), size);
-
-				client->send_binary(std::move(data), size);
+				file.read((char*)buffer.data.get(), size);
+				
+				file.close();
+				
+				return buffer;
 			}
 
-			file.close();
+			return buf;
 		}
 	);
-
-	client->set_callback_string(
-		[&](auto frame, auto text)
-		{
-			client->send_string(frame, std::move(text));
-		}
-	);
-
-	client->bro = CefBrowserHost::CreateBrowserSync(windowInfo, client, URL, browserSettings, nullptr, nullptr);
 
 	//std::thread th([&]() {
 
