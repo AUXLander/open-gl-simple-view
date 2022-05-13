@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+<script language="javascript" type="text/javascript">
+"use strict";
+var output;
+var ws;
+var Module;
+var canvas;
+var ctx;
+var input;
+var img;
+
+
+function init() {
+    output = document.getElementById("output");
+    input  = document.getElementById('input');
+	canvas = document.getElementById("canvas");
+	ctx    = canvas.getContext('2d');
+		
+    if (Module)
+    {
+        Module.setReceiveData(onReceiveData);
+    }
+}
+
+function writeToScreen(message) {
+    let p = document.createElement('p');
+    p.style.wordWrap = 'break-word';
+    p.innerHTML = message;
+
+    if (output.childNodes.length > 5) {
+        output.removeChild(output.childNodes[0]);
+    }
+    output.appendChild(p);
+}
+
+function onReceiveData(message)
+{
+    let command = message.command;
+    let content = message.content;
+
+    switch(command)
+    {
+        case "onBinary": 
+        {
+            img = new Image();
+
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0);
+            };
+
+            const promise = new Promise((resolve, reject) => {
+                resolve(new Blob([new Uint8Array(content).buffer], { type : 'image/bmp' }))
+            });
+
+            promise.then(blob => img.src = URL.createObjectURL(blob));
+        }
+        break;
+
+        case "onString":
+        {
+            writeToScreen('<span style="color: blue;">RESPONSE: ' + content + '</span>');
+        }
+        break;
+    }
+}
+
+function doSend(message) {
+    writeToScreen("SENT: " + message);
+
+    Module.sendData({command : "onString", content : message })
+}
+
+window.addEventListener('load', init, false);
+
+function wsSend() {
+    doSend(document.getElementById('data_to_send').value);
+}
+
+function wsSendBinary() {
+    var array = new Uint8Array(5);
+
+    for (var i = 0; i < array.length; ++i) {
+        array[i] = i + 5;
+    }
+
+    Module.sendData({command : 'onBinary', content : array });
+}
+
+</script>
+<style>
+    * { outline: 0 !important; }
+</style>
+</head>
+<body style="font-family: sans-serif; font-size: 1.5em">
+    <h1>IPC send image</h1>
+
+    <div class="container-fluid">
+        <div class="row" style="max-width: 500px; margin: 0 auto; ">
+            <form onsubmit="return false" >
+                <div class="form-group">
+                  <label for="exampleInputEmail1">Data to send</label>
+                  <div class="row" style="display: flex; flex-direction: row;">
+                    <input class="form-control" type="text" id="data_to_send" value="hello"></input>
+                    <button class="btn btn-default" id="sender" onClick="wsSend()">Send</button>
+                  </div>
+
+                </div>
+            </form>
+
+
+        </div>
+      </div>
+
+
+
+
+
+    
+    
+    <button class="btn btn-default" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
+	
+	
+	<input class="form-control"  type='file' accept='image' capture='camera' id='input'>
+	<button class="btn btn-default" id="sender_binary" onClick="sendpng()">Send picture</button>
+
+	<canvas id='canvas' width="640" height="640"></canvas>
+
+
+    <div id="output"></div>
+</body>
+</html>
