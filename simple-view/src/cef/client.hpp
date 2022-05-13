@@ -34,79 +34,79 @@ void setupResourceManagerDirectoryProvider(CefRefPtr<CefResourceManager> resourc
 	resource_manager->AddDirectoryProvider(uri, dir, 1, dir);
 }
 
-template<class ArgumentList>
-struct callback_base
-{
-	using argslist = typename ArgumentList;
-
-protected:
-	const char* __name;
-
-	callback_base(const char* name) :
-		__name{ name }
-	{;}
-
-public:
-	virtual void call() {};
-	virtual void resolve_argument_list(ArgumentList args) {};
-	virtual ~callback_base() {}
-
-	CefRefPtr<CefProcessMessage> message() const
-	{
-		return CefProcessMessage::Create(__name);
-	}
-
-	void operator()()
-	{
-		return call();
-	}
-
-	const char* name() const
-	{
-		return __name;
-	}
-};
-
-template<class T, class ArgumentList, class function, class resolver>
-struct callback : public callback_base<ArgumentList>
-{
-	using argslist = typename ArgumentList;
-	using argument = typename T;
-
-private:
-	function __fnc;
-	resolver __rsl;
-	argument __arg;
-
-public:
-	callback(const char* name, function f, resolver r) :
-		callback_base<ArgumentList>(name),
-		__fnc{ f }, __rsl{ r }
-	{;}
-
-	callback(callback<T, ArgumentList, function, resolver>&&) = default;
-	callback(const callback<T, ArgumentList, function, resolver>&) = default;
-
-	virtual void resolve_argument_list(argslist args) override
-	{
-		set_argument(std::move(__rsl(args)));
-	}
-
-	virtual void call() override
-	{
-		__fnc(message(), std::move(__arg));
-	}
-
-	void set_argument(argument &&arg)
-	{
-		__arg = std::move(arg);
-	}
-};
-
 
 // this is only needed so we have a way to break the message loop
 struct MinimalClient : public CefClient, public CefLifeSpanHandler, public CefRequestHandler, public CefResourceRequestHandler
 {
+	template<class ArgumentList>
+	struct callback_base
+	{
+		using argslist = typename ArgumentList;
+
+	protected:
+		const char* __name;
+
+		callback_base(const char* name) :
+			__name{ name }
+		{;}
+
+	public:
+		virtual void call() {};
+		virtual void resolve_argument_list(ArgumentList args) {};
+		virtual ~callback_base() {}
+
+		CefRefPtr<CefProcessMessage> message() const
+		{
+			return CefProcessMessage::Create(__name);
+		}
+
+		void operator()()
+		{
+			return call();
+		}
+
+		const char* name() const
+		{
+			return __name;
+		}
+	};
+
+	template<class T, class ArgumentList, class function, class resolver>
+	struct callback : public callback_base<ArgumentList>
+	{
+		using argslist = typename ArgumentList;
+		using argument = typename T;
+
+	private:
+		function __fnc;
+		resolver __rsl;
+		argument __arg;
+
+	public:
+		callback(const char* name, function f, resolver r) :
+			callback_base<ArgumentList>(name),
+			__fnc{ f }, __rsl{ r }
+		{;}
+
+		callback(callback<T, ArgumentList, function, resolver>&&) = default;
+		callback(const callback<T, ArgumentList, function, resolver>&) = default;
+
+		virtual void resolve_argument_list(argslist args) override
+		{
+			set_argument(std::move(__rsl(args)));
+		}
+
+		virtual void call() override
+		{
+			__fnc(message(), std::move(__arg));
+		}
+
+		void set_argument(argument&& arg)
+		{
+			__arg = std::move(arg);
+		}
+	};
+
 	using callback_base_arguments = CefRefPtr<CefListValue>;
 
 	template<class T, class function, class resolver>

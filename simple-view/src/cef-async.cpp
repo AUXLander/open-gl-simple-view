@@ -31,8 +31,39 @@ int main(int argc, char* argv[])
 	std::string appType = commandLine->GetSwitchValue("type");
 	if (appType == "renderer" || appType == "zygote")
 	{
-		app = new RendererApp;
+		auto __renderer = new RendererApp;
+
+		__renderer->register_callback(
+			"onString",
+			[](auto& package, auto args) {
+
+				auto string = CefV8Value::CreateString(args->GetString(0).ToString());
+
+				package->SetValue("content", string, cef_v8_propertyattribute_t::V8_PROPERTY_ATTRIBUTE_NONE);
+			}
+		);
+
+		__renderer->register_callback(
+			"onBinary",
+			[](auto& package, auto args) {
+				auto binary = args->GetBinary(0);
+				auto size = args->GetSize();
+
+				if (size)
+				{
+					uint8_t* buffer = new uint8_t[size]{0};
+
+					binary->GetData(buffer, size, 0);
+
+					auto bin = CefV8Value::CreateArrayBuffer(buffer, size, new ReleaseCallback());
+
+					package->SetValue("content", bin, cef_v8_propertyattribute_t::V8_PROPERTY_ATTRIBUTE_NONE);
+				}
+			}
+		);
+
 		// use nullptr for other process types
+		app = __renderer;
 	}
 
 	int result = CefExecuteProcess(args, app, windowsSandboxInfo);
@@ -54,7 +85,7 @@ int main(int argc, char* argv[])
 
 #if defined(_WIN32)
 	// On Windows we need to specify certain flags that will be passed to CreateWindowEx().
-	windowInfo.SetAsPopup(NULL, "simple");
+	windowInfo.SetAsPopup(NULL, "simple view");
 #endif
 	CefBrowserSettings browserSettings;
 
@@ -67,7 +98,9 @@ int main(int argc, char* argv[])
 		// function to process strings
 		[&client](CefRefPtr<CefProcessMessage> msg, std::string &&text) -> void {
 
-			msg->GetArgumentList()->SetString(0, std::move(text));
+			auto message = CefString(std::move(text));
+
+			msg->GetArgumentList()->SetString(0, message);
 
 			client->send(msg);
 		}, 

@@ -24,8 +24,7 @@ function init() {
 		
     if (Module)
     {
-        Module.setReceiveStringData(onReceiveString);
-        Module.setReceiveBinaryData(onReceiveBinary);
+        Module.setReceiveData(onReceiveData);
     }
 }
 
@@ -40,14 +39,15 @@ function writeToScreen(message) {
     output.appendChild(p);
 }
 
-function onReceiveBinary(message)
+function onReceiveData(message)
 {
-    switch(message.command)
+    let command = message.command;
+    let content = message.content;
+
+    switch(command)
     {
         case "onBinary": 
         {
-            writeToScreen('<span style="color: blue;">RESPONSE: ' + message.command + '</span>');
-
             img = new Image();
 
             img.onload = () => {
@@ -55,23 +55,25 @@ function onReceiveBinary(message)
             };
 
             const promise = new Promise((resolve, reject) => {
-                resolve(new Blob([new Uint8Array(message).buffer], { type : 'image/bmp' }))
+                resolve(new Blob([new Uint8Array(content).buffer], { type : 'image/bmp' }))
             });
 
             promise.then(blob => img.src = URL.createObjectURL(blob));
         }
-    }
-}
+        break;
 
-function onReceiveString(message) 
-{
-    writeToScreen('<span style="color: blue;">RESPONSE: ' + message + '</span>');
+        case "onString":
+        {
+            writeToScreen('<span style="color: blue;">RESPONSE: ' + content + '</span>');
+        }
+        break;
+    }
 }
 
 function doSend(message) {
     writeToScreen("SENT: " + message);
 
-    Module.sendString(message);
+    Module.sendData({command : "onString", content : message })
 }
 
 window.addEventListener('load', init, false);
@@ -81,13 +83,13 @@ function wsSend() {
 }
 
 function wsSendBinary() {
-    const array = new Uint8Array(5);
+    var array = new Uint8Array(5);
 
     for (var i = 0; i < array.length; ++i) {
         array[i] = i + 5;
-    }   
+    }
 
-    Module.sendBinary(array);
+    Module.sendData({command : 'onBinary', content : array });
 }
 
 </script>

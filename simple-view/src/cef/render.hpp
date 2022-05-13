@@ -8,62 +8,53 @@
 #include "../utils/directory.hpp"
 #include <jsbind.hpp>
 #include <iostream>
+#include <map>
 
-jsbind::persistent jsOnReceiveStringData;
-jsbind::persistent jsOnReceiveBinaryData;
+jsbind::persistent jsOnReceiveData;
 
-void setReceiveStringData(jsbind::local func)
+void setReceiveData(jsbind::local func)
 {
-	jsOnReceiveStringData.reset(func);
+	jsOnReceiveData.reset(func);
 }
 
-void setReceiveBinaryData(jsbind::local func)
+void receiveData(jsbind::local v)
 {
-	jsOnReceiveBinaryData.reset(func);
-}
+	auto command = v["command"].as<std::string>();
 
-void receiveBinary(jsbind::local v)
-{
-	auto msg = CefProcessMessage::Create("onBinary");
+	auto msg = CefProcessMessage::Create(command);
+	auto arg = msg->GetArgumentList();
 
-	auto jsvec = jsbind::vecFromJSArray<uint8_t>(v);
-
-	auto data = jsvec.data();
-	auto size = jsvec.size();
-
-	if (data)
+	if (!command.compare("onString"))
 	{
-		CefRefPtr<CefBinaryValue> binary(CefBinaryValue::Create(data, size));
+		auto content = v["content"].as<std::string>();
 
-		msg->GetArgumentList()->SetBinary(0, binary);
-		msg->GetArgumentList()->SetSize(size);
+		arg->SetString(0, content.data());
+		arg->SetSize(content.size());
 
 		CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
 	}
-}
+	else if (!command.compare("onBinary"))
+	{
+		auto content = jsbind::vecFromJSArray<uint8_t>(v["content"]);
 
-void receiveString(jsbind::local v)
-{
-	auto msg = CefProcessMessage::Create("onString");
+		auto size = content.size();
 
-	auto jsstr = v.as<std::string>();
+		if (!content.empty())
+		{
+			CefRefPtr<CefBinaryValue> binary(CefBinaryValue::Create(content.data(), size));
 
-	auto data = jsstr.data();
-	auto size = jsstr.size();
+			msg->GetArgumentList()->SetBinary(0, binary);
+			msg->GetArgumentList()->SetSize(size);
 
-	msg->GetArgumentList()->SetString(0, jsstr);
-	msg->GetArgumentList()->SetSize(size);
-
-	CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+			CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+		}
+	}
 }
 
 JSBIND_BINDINGS(App)
 {
-	jsbind::function("sendString", receiveString);
-	jsbind::function("sendBinary", receiveBinary);
-
-	jsbind::function("setReceiveStringData", setReceiveStringData);
-	jsbind::function("setReceiveBinaryData", setReceiveBinaryData);
+	jsbind::function("sendData", receiveData);
+	jsbind::function("setReceiveData", setReceiveData);
 }
 
 class ReleaseCallback : public CefV8ArrayBufferReleaseCallback
@@ -78,14 +69,24 @@ public:
 	IMPLEMENT_REFCOUNTING(ReleaseCallback);
 };
 
-class RendererApp : public CefApp, public CefRenderProcessHandler
+struct RendererApp : public CefApp, public CefRenderProcessHandler
 {
+	using callback = std::function<void(CefRefPtr<CefV8Value>& data, CefRefPtr<CefListValue>)>;
+private:
+
+	std::multimap<std::string, callback> __cbstorage;
+
 public:
 	RendererApp() = default;
 
 	CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override
 	{
 		return this;
+	}
+
+	void register_callback(const char* name, callback&& f)
+	{
+		__cbstorage.emplace(name, std::move(f));
 	}
 
 	void OnContextCreated(CefRefPtr<CefBrowser> /*browser*/, CefRefPtr<CefFrame> /*frame*/, CefRefPtr<CefV8Context> /*context*/) override
@@ -96,8 +97,9 @@ public:
 	void OnContextReleased(CefRefPtr<CefBrowser> /*browser*/, CefRefPtr<CefFrame> /*frame*/, CefRefPtr<CefV8Context> /*context*/) override
 	{
 		jsbind::enter_context();
-		jsOnReceiveStringData.reset();
-		jsOnReceiveBinaryData.reset();
+		
+		jsOnReceiveData.reset();
+
 		jsbind::exit_context();
 		jsbind::deinitialize();
 	}
@@ -106,42 +108,35 @@ public:
 	{
 		auto name = message->GetName();
 		auto args = message->GetArgumentList();
+		auto sent = false;
 
-		jsbind::enter_context();
+		auto it = __cbstorage.find(name);
 
-		std::unique_ptr<jsbind::local> data{ nullptr };
-
-		if (name == "onString")
+		while (it != __cbstorage.end() && it->first == name.ToString())
 		{
-			data.reset(new jsbind::local(args->GetString(0).ToString()));
-		}
-		else if (name == "onBinary")
-		{
-			auto binary = args->GetBinary(0);
-			auto size = args->GetSize();
+			jsbind::enter_context();
 
-			if (size)
+			auto package = CefV8Value::CreateObject(NULL, NULL);
+
+			(*it).second(package, args);
+
+			auto content = package->GetValue("content");
+
+			if (!content->IsUndefined())
 			{
-				uint8_t* buffer = new uint8_t[size];
+				package->SetValue("command", CefV8Value::CreateString(name.ToString()), CefV8Value::PropertyAttribute::V8_PROPERTY_ATTRIBUTE_NONE);
 
-				binary->GetData(buffer, size, 0);
+				jsOnReceiveData.to_local()(jsbind::local(package));
 
-				data.reset(new jsbind::local(CefV8Value::CreateArrayBuffer(buffer, size, new ReleaseCallback())));
-
-				//jsOnReceiveBinaryData.to_local()(jsbind::local(CefV8Value::CreateArrayBuffer(buffer, size, new ReleaseCallback())));
+				sent = true;
 			}
+
+			jsbind::exit_context();
+
+			++it;
 		}
 
-		if (data)
-		{
-			data->set("command", name.ToString());
-
-			jsOnReceiveBinaryData.to_local()(*data);
-		}
-
-		jsbind::exit_context();
-
-		return (bool)data;
+		return sent;
 	}
 private:
 	IMPLEMENT_REFCOUNTING(RendererApp);
