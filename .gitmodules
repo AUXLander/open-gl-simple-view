@@ -1,3 +1,9 @@
 [submodule "external/glfw"]
 	path = external/glfw
 	url = https://github.com/glfw/glfw.git
+[submodule "external/jsbind"]
+	path = external/jsbind
+	url = https://github.com/Chobolabs/jsbind.git
+[submodule "external/cef-cmake"]
+	path = external/cef-cmake
+	url = https://github.com/AUXLander/cef-cmake.git
