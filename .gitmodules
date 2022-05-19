@@ -7,3 +7,6 @@
 [submodule "external/cef-cmake"]
 	path = external/cef-cmake
 	url = https://github.com/AUXLander/cef-cmake.git
+[submodule "external/CImg"]
+	path = external/CImg
+	url = https://github.com/dtschump/CImg.git

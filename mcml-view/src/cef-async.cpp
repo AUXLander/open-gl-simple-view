@@ -1,10 +1,88 @@
 #include "cef/client.hpp"
 #include "cef/render.hpp"
 
+#include <glad/glad.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
+
+
+#include "gl_draw.h"
+
 #include <string>
 #include <vector>
 #include <cassert>
 #include <iostream>
+
+
+struct OpenGLClient : public MinimalClient
+{
+	GLFWwindow* window;
+
+	explorer ex;
+
+	static CefRefPtr<OpenGLClient> CreateBrowserSync(const CefWindowInfo& windowInfo, const CefString& url, const CefBrowserSettings& settings, CefRefPtr<CefDictionaryValue> extra_info, CefRefPtr<CefRequestContext> request_context)
+	{
+		CefRefPtr<OpenGLClient> client(new OpenGLClient);
+
+		client->__browser = CefBrowserHost::CreateBrowserSync(windowInfo, client, url, settings, extra_info, request_context);
+
+		//client->__main_tread.reset(new std::thread(client->main()));
+
+		//client->__main_tread->detach();
+
+		client->main();
+
+		return client;
+	}
+
+	int main() override
+	{
+		/* Initialize the library */
+		if (!glfwInit())
+		{
+			return -1;
+		}
+
+		window = glfwCreateWindow(800, 800, "MCML Draw", NULL, NULL);
+
+		SetWindowPos(glfwGetWin32Window(window), HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_HIDEWINDOW);
+		//SetWindowPos(glfwGetWin32Window(window), HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+		glfwMakeContextCurrent(window);
+
+		if (!gladLoadGL())
+		{
+			return -2;
+		}
+
+		std::cout << "Render device: " << glGetString(GL_RENDERER) << '\n';
+		std::cout << "OpenGL " << GLVersion.major << "." << GLVersion.minor << '\n';
+
+		ex.init(800, 800);
+
+		ex.set_file("D:\\BINARY_DATA.BIN");
+
+		ex.load_binary();
+	}
+
+	void draw()
+	{
+		glfwMakeContextCurrent(window);
+
+		glfwPollEvents();
+
+		ex.select_current_z_index(148);
+
+		ex.invalidate_frame();
+
+		ex.DrawTexture();
+
+		glfwSwapBuffers(window);
+	}
+};
+
 
 int main(int argc, char* argv[])
 {
@@ -89,7 +167,7 @@ int main(int argc, char* argv[])
 #endif
 	CefBrowserSettings browserSettings;
 
-	auto client = MinimalClient::CreateBrowserSync(windowInfo, URL, browserSettings, nullptr, nullptr);
+	auto client = OpenGLClient::CreateBrowserSync(windowInfo, URL, browserSettings, nullptr, nullptr);
 
 	client->register_callback<std::string>(
 		// name of method to bind
@@ -111,53 +189,67 @@ int main(int argc, char* argv[])
 		}
 	);
 
-	client->register_callback<buffer<uint8_t>>(
+	client->register_callback<std::pair<uint8_t*, size_t>>(
 		// name of method to bind
 		"onBinary",
 
 		// function to process buffer
-		[&client](CefRefPtr<CefProcessMessage> msg, buffer<uint8_t> &&buffer) -> void {
+		[&client](CefRefPtr<CefProcessMessage> msg, std::pair<uint8_t*, size_t> buffer) -> void {
 
-			auto binary = CefBinaryValue::Create(buffer.data.get(), buffer.size);
+			auto [ptr, size] = buffer;
 
-			msg->GetArgumentList()->SetSize(buffer.size);
+			//return;
+
+			auto binary = CefBinaryValue::Create(ptr, size);
+
 			msg->GetArgumentList()->SetBinary(0, binary);
+			msg->GetArgumentList()->SetSize(size);
 
 			client->send(msg);
 		},
 
 		// function to resolve argument lists
-		[](auto arglist) -> buffer<uint8_t> {
+		[&client](auto arglist) -> std::pair<uint8_t*, size_t> {
 
 			auto binary = arglist->GetBinary(0);
 			auto size = arglist->GetSize();
 
-			buffer<uint8_t> buf(size);
 
-			binary->GetData(buf.data.get(), size, 0);
+			//binary->GetData(buf.data.get(), size, 0);
 
-			std::ifstream file("D:\\file.bmp", std::ios_base::binary);
+			client->draw();
 
-			if (file.is_open())
-			{
-				size_t size = file.tellg();
+			uint8_t * p = client->ex.get_texture();
+			size_t s = 54 + client->ex.get_texture_size();
 
-				file.seekg(0, std::ios::end);
+			//return std::pair<uint8_t*, size_t>(nullptr, 0);
+			
+			
+			return std::pair<uint8_t*, size_t>(p, s);
+			
+			
+			//std::ifstream file("D:\\file.bmp", std::ios_base::binary);
+			//
+			//if (file.is_open())
+			//{
+			//	size_t size = file.tellg();
 
-				size = (size_t)file.tellg() - size;
+			//	file.seekg(0, std::ios::end);
 
-				file.seekg(0, std::ios::beg);
+			//	size = (size_t)file.tellg() - size;
 
-				buffer<uint8_t> buffer(size);
+			//	file.seekg(0, std::ios::beg);
 
-				file.read((char*)buffer.data.get(), size);
-				
-				file.close();
-				
-				return buffer;
-			}
+			//	buffer<uint8_t> buffer(size);
 
-			return buf;
+			//	file.read((char*)buffer.data.get(), size);
+			//	
+			//	file.close();
+			//	
+			//	return buffer;
+			//}
+
+			//return std::pair<uint8_t*, size_t>(nullptr, 0);
 		}
 	);
 

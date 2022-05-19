@@ -20,7 +20,7 @@
 //const char* const URL = URI_ROOT "/cef-echo.html";
 
 #define URI_ROOT "http://localhost:8000"
-const char* const URL = "file:///F:/UserData/Projects/open-gl-simple-view/simple-view/html/cef-echo.html";
+const char* const URL = "file:///F:/UserData/Projects/open-gl-simple-view/mcml-view/html/cef-echo.html";
 
 void setupResourceManagerDirectoryProvider(CefRefPtr<CefResourceManager> resource_manager, std::string uri, std::string dir)
 {
@@ -93,7 +93,9 @@ struct MinimalClient : public CefClient, public CefLifeSpanHandler, public CefRe
 
 		virtual void resolve_argument_list(argslist args) override
 		{
-			set_argument(std::move(__rsl(args)));
+			auto result = __rsl(args);
+
+			set_argument(std::move(result));
 		}
 
 		virtual void call() override
@@ -117,7 +119,7 @@ struct MinimalClient : public CefClient, public CefLifeSpanHandler, public CefRe
 
 	std::multimap<std::string, std::unique_ptr<callback_base_t>> __cbstorage;
 
-private:
+protected:
 
 	CefRefPtr<CefBrowser> __browser;
 
@@ -130,15 +132,13 @@ private:
 		setupResourceManagerDirectoryProvider(m_resourceManager, URI_ROOT, assetPath);
 	}
 
+	std::unique_ptr<std::thread> __main_tread{ nullptr };
+
 public:
 
-	static CefRefPtr<MinimalClient> CreateBrowserSync(const CefWindowInfo& windowInfo, const CefString& url, const CefBrowserSettings& settings, CefRefPtr<CefDictionaryValue> extra_info, CefRefPtr<CefRequestContext> request_context) 
+	virtual int main()
 	{
-		CefRefPtr<MinimalClient> client(new MinimalClient);
-
-		client->__browser = CefBrowserHost::CreateBrowserSync(windowInfo, client, url, settings, extra_info, request_context);
-
-		return client;
+		return 0;
 	}
 
 	template<class T, class function, class resolver>
