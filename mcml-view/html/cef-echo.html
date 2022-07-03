@@ -1,137 +1,120 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
-<script language="javascript" type="text/javascript">
-"use strict";
-var output;
-var ws;
-var Module;
-var canvas;
-var ctx;
-var input;
-var img;
-
-
-function init() {
-    output = document.getElementById("output");
-    input  = document.getElementById('input');
-	canvas = document.getElementById("canvas");
-	ctx    = canvas.getContext('2d');
-		
-    if (Module)
-    {
-        Module.setReceiveData(onReceiveData);
-    }
-}
-
-function writeToScreen(message) {
-    let p = document.createElement('p');
-    p.style.wordWrap = 'break-word';
-    p.innerHTML = message;
-
-    if (output.childNodes.length > 5) {
-        output.removeChild(output.childNodes[0]);
-    }
-    output.appendChild(p);
-}
-
-function onReceiveData(message)
-{
-    let command = message.command;
-    let content = message.content;
-
-    switch(command)
-    {
-        case "onBinary": 
-        {
-            img = new Image();
-
-            img.onload = () => {
-                ctx.drawImage(img, 0, 0);
-            };
-
-            const promise = new Promise((resolve, reject) => {
-                resolve(new Blob([new Uint8Array(content).buffer], { type : 'image/bmp' }))
-            });
-
-            promise.then(blob => img.src = URL.createObjectURL(blob));
-        }
-        break;
-
-        case "onString":
-        {
-            writeToScreen('<span style="color: blue;">RESPONSE: ' + content + '</span>');
-        }
-        break;
-    }
-}
-
-function doSend(message) {
-    writeToScreen("SENT: " + message);
-
-    Module.sendData({command : "onString", content : message })
-}
-
-window.addEventListener('load', init, false);
-
-function wsSend() {
-    doSend(document.getElementById('data_to_send').value);
-}
-
-function wsSendBinary() {
-    var array = new Uint8Array(5);
-
-    for (var i = 0; i < array.length; ++i) {
-        array[i] = i + 5;
-    }
-
-    Module.sendData({command : 'onBinary', content : array });
-}
-
-</script>
-<style>
-    * { outline: 0 !important; }
-</style>
+    
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body style="font-family: sans-serif; font-size: 1.5em">
-    <h1>IPC send image</h1>
+<body>
+    <h1>Monte Carlo Visualizer</h1>
 
-    <div class="container-fluid">
-        <div class="row" style="max-width: 500px; margin: 0 auto; ">
-            <form onsubmit="return false" >
-                <div class="form-group">
-                  <label for="exampleInputEmail1">Data to send</label>
-                  <div class="row" style="display: flex; flex-direction: row;">
-                    <input class="form-control" type="text" id="data_to_send" value="hello"></input>
-                    <button class="btn btn-default" id="sender" onClick="wsSend()">Send</button>
-                  </div>
-
+    <div class="layview">
+        <div class="layview__laytabs laytabs">
+            <div class="laytabs__tab laytab active">
+                <div class="laytab__wrp">
+                    <label>Вкладка 1</label>
+                    <div class="laytab__close">x</div>
                 </div>
-            </form>
+            </div>
+            <div class="laytabs__tab laytab">
+                <div class="laytab__wrp">
+                    <label>Вкладка 2</label>
+                    <div class="laytab__close">x</div>
+                </div>
+            </div>
 
+            <div class="laytabs__tab">
+                <label> Add new </label>
+            </div>
+        </div>
+
+        <!-- VIRTUAL BODY -->
+        
+        <div class="layview__vbody virtual-body" style="display: none;">
+            <div class="container-fluid">
+                <div class="row" style="max-width: 500px; margin: 0 auto; ">
+                    <form onsubmit="return false" >
+                        <div class="form-group">
+                          <label for="exampleInputEmail1">Data to send</label>
+                          <div class="row" style="display: flex; flex-direction: row;">
+                            <input class="form-control" type="text" id="data_to_send" value="hello"></input>
+                            <button class="btn btn-default" id="sender" onClick="wsSend()">Send</button>
+                          </div>
+        
+                        </div>
+                    </form>
+        
+        
+                </div>
+            </div>
+        
+            <button class="btn btn-default" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
+            <button class="btn btn-default" id="sender_binary" onClick="sendpng()">Send picture</button>
 
         </div>
-      </div>
 
+        <div class="layview__vbody virtual-body">
 
-
-
-
+            <div class="row flex-nowrap">
+                <div class="w-100" style="display:flex; padding: 15px">
+                    <input class="form-control"  type='file' accept='image' capture='camera' id='input'>
+                    <button class="btn btn-default" id="sender" onClick="wsSend()" style="margin-left: 15px">Загрузить</button>
+                </div>
+            </div>
+        
+            <div class="row flex-nowrap">
+                <div class="d-flex flex-column w-100" style="padding: 0 15px;">
+                    <canvas style="display: none;" id='canvas' width="800" height="800"></canvas>
+                    <img src="F:\UserData\Desktop\blurred 2.bmp" alt="" width="800" height="800">
+                </div>
     
+                <div class="d-flex flex-column w-100" style="padding: 0 15px 0 0">
+                    <h3 style="margin-top: 0">Параметры визуализации</h3>
     
-    <button class="btn btn-default" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
-	
-	
-	<input class="form-control"  type='file' accept='image' capture='camera' id='input'>
-	<button class="btn btn-default" id="sender_binary" onClick="sendpng()">Send picture</button>
+                    <label class="form-label">
+                        <span><b>Номер слоя</b></span>    
+                    </label>
+                    <div class="input-group mb-3">
+                        <input class="form-control" id="layer-index" value="3">
+                    </div>
 
-	<canvas id='canvas' width="800" height="800"></canvas>
+                    <label class="form-label">
+                        <span><b>z-index</b></span>
+                    </label>
+                    <div class="input-group mb-3">
+                        <input class="form-control" id="z-index" value="100">
+                    </div>
+                    
+                    <label class="form-label">
+                        <span><b>Гистограмма плотностей</b></span>
+                    </label>
+                    <div class="input-group mb-3">
+                        <div class="gist">
+                            <div class="gist__canvas">
+                                <canvas class="gistogramm"></canvas>
+                            </div>
 
+                            <div class="gist__ctrl">
+                                <input class="gist__ctrl-element gist__ctrl-element_param form-control" value="255">
 
-    <div id="output"></div>
+                                <div class="gist__ctrl-element gist__ctrl-element_gradient" style="background: linear-gradient(90deg, black, white);"></div>
+
+                                <input class="gist__ctrl-element gist__ctrl-element_param  form-control" value="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-default" onClick="">Display</button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
 </body>
+<script src="/common.js"></script>
 </html>
