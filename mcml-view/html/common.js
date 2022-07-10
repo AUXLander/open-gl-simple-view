@@ -7,7 +7,6 @@ var ctx;
 var input;
 var img;
 
-
 function init() {
     output = document.getElementById("output");
     input  = document.getElementById('input');
@@ -20,6 +19,8 @@ function init() {
     }
 }
 
+window.addEventListener('load', init, false);
+
 function writeToScreen(message) {
     let p = document.createElement('p');
     p.style.wordWrap = 'break-word';
@@ -29,6 +30,16 @@ function writeToScreen(message) {
         output.removeChild(output.childNodes[0]);
     }
     output.appendChild(p);
+}
+
+function doSend(message) {
+    writeToScreen("SENT: " + message);
+
+    Module.sendData({command : "onString", content : message })
+}
+
+function wsSend() {
+    doSend(document.getElementById('data_to_send').value);
 }
 
 function onReceiveData(message)
@@ -62,16 +73,14 @@ function onReceiveData(message)
     }
 }
 
-function doSend(message) {
-    writeToScreen("SENT: " + message);
-
-    Module.sendData({command : "onString", content : message })
+function set_lower_bound(value)
+{
+    Module.sendData({command : 'onSetLowerBound', content : parseFloat(`${value}`) });
 }
 
-window.addEventListener('load', init, false);
-
-function wsSend() {
-    doSend(document.getElementById('data_to_send').value);
+function set_upper_bound(value)
+{
+    Module.sendData({command : 'onSetUpperBound', content : parseFloat(`${value}`) });
 }
 
 function wsSendBinary() {

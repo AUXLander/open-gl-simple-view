@@ -10,7 +10,40 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Monte Carlo Visualizer</h1>
+    <!-- <h1>Monte Carlo Visualizer</h1> -->
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+                <a class="nav-link" href="#">Файл</a>
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Редактирование
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <a class="dropdown-item" href="#">Action</a>
+                <a class="dropdown-item" href="#">Another action</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="#">Something else here</a>
+                </div>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Экспорт</a>
+            </li>
+            </ul>
+            <a class="navbar-brand" href="#">Monte Carlo Visualizer</a>
+            <form class="form-inline my-2 my-lg-0">
+            <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Github</button>
+            </form>
+        </div>
+    </nav>
+    <br>
 
     <div class="layview">
         <div class="layview__laytabs laytabs">
@@ -28,7 +61,7 @@
             </div>
 
             <div class="laytabs__tab">
-                <label> Add new </label>
+                <div class="laytabs__add">Add</div>
             </div>
         </div>
 
@@ -51,11 +84,15 @@
         
                 </div>
             </div>
+
+            
+            <div id="output"></div>
         
-            <button class="btn btn-default" id="sender_binary" onClick="wsSendBinary()">Send Binary</button>
-            <button class="btn btn-default" id="sender_binary" onClick="sendpng()">Send picture</button>
 
         </div>
+
+
+        <!-- VIRTUAL BODY -->
 
         <div class="layview__vbody virtual-body">
 
@@ -68,8 +105,8 @@
         
             <div class="row flex-nowrap">
                 <div class="d-flex flex-column w-100" style="padding: 0 15px;">
-                    <canvas style="display: none;" id='canvas' width="800" height="800"></canvas>
-                    <img src="F:\UserData\Desktop\blurred 2.bmp" alt="" width="800" height="800">
+                    <canvas id='canvas' width="800" height="800"></canvas>
+                    <!-- <img src="F:\UserData\Desktop\blurred 2.bmp" alt="" width="800" height="800"> -->
                 </div>
     
                 <div class="d-flex flex-column w-100" style="padding: 0 15px 0 0">
@@ -79,36 +116,45 @@
                         <span><b>Номер слоя</b></span>    
                     </label>
                     <div class="input-group mb-3">
-                        <input class="form-control" id="layer-index" value="3">
+                        <input class="form-control" id="l-index" value="0" onfocusout="__app.modules.view.set_l_index(); __app.modules.view.request();">
                     </div>
 
                     <label class="form-label">
                         <span><b>z-index</b></span>
                     </label>
                     <div class="input-group mb-3">
-                        <input class="form-control" id="z-index" value="100">
+                        <input class="form-control" id="z-index" value="0" onfocusout="__app.modules.view.set_z_index(); __app.modules.view.request();">
                     </div>
                     
                     <label class="form-label">
-                        <span><b>Гистограмма плотностей</b></span>
+                        <span><b>Гистограмма плотностей слоя</b></span>
                     </label>
                     <div class="input-group mb-3">
                         <div class="gist">
                             <div class="gist__canvas">
-                                <canvas class="gistogramm"></canvas>
+                                <canvas></canvas>
+                            </div>
+
+                            <div class="gist__labels">
+                                <label data-type="0.0">0%</label>
+                                <label data-type=".25">25%</label>
+                                <label data-type=".50">50%</label>
+                                <label data-type=".75">75%</label>
+                                <label data-type="1.0">100%</label>
                             </div>
 
                             <div class="gist__ctrl">
-                                <input class="gist__ctrl-element gist__ctrl-element_param form-control" value="255">
+                                <input id="lower_input" onfocusout="__app.modules.gctrl.set_lower_bound()" class="gist__ctrl-element gist__ctrl-element_param  form-control" value="0.0">
 
-                                <div class="gist__ctrl-element gist__ctrl-element_gradient" style="background: linear-gradient(90deg, black, white);"></div>
+                                <div class="gist__ctrl-element gist__ctrl-element_gradient" style="background: linear-gradient(90deg, white, black);"></div>
 
-                                <input class="gist__ctrl-element gist__ctrl-element_param  form-control" value="0">
+                                <input id="upper_input" onfocusout="__app.modules.gctrl.set_upper_bound()" class="gist__ctrl-element gist__ctrl-element_param form-control" value="1.0">
                             </div>
                         </div>
                     </div>
 
-                    <button class="btn btn-default" onClick="">Display</button>
+                    <!-- <button class="btn btn-default" onClick="__app.modules.view.request()">Display</button> -->
+                    <!-- <button class="btn btn-default" onClick="__app.modules.gist.request()">Get Gist</button> -->
                 </div>
             </div>
 
@@ -116,5 +162,468 @@
 
     </div>
 </body>
-<script src="/common.js"></script>
+
+<script>
+"use strict";
+
+function Gist(app)
+{
+    let gist = {
+
+        controls : {
+            object : {},
+            canvas : {},
+            context : {},
+            labels : {
+                dt000 : undefined,
+                dt025 : undefined,
+                dt050 : undefined,
+                dt075 : undefined,
+                dt100 : undefined,
+            }
+        },
+
+        settings : {
+            min_x : 0,
+            max_x : 389,
+
+            min_y : 0,
+            max_y : 0,
+            step  : 0, 
+
+            width : 389,
+            height : 150,
+            dimensions : 0
+        },
+
+        colorset : [
+
+            { min:   0, max:  90, func: (x, h) => `rgba(${255 - x},        0,        0,1)` },
+            { min:  90, max:  180, func: (x, h) => `rgba( 225,${255 - x - 30},        0,1)` },
+            { min:  180, max: 389, func: (x, h) => `rgba(  225,       225,${255 - x - 60},1)` },
+        ],
+
+        data: [
+            // { x : 1, y : 10 },
+        ],
+
+        init : () => {
+
+            const object = document.querySelector('.gist');
+            const canvas = object.querySelector('canvas');
+            const labels = object.querySelector('.gist__labels');
+
+            console.assert(object);
+            console.assert(canvas);
+            console.assert(labels)
+
+            if (canvas && labels)
+            {
+                gist.controls.object = object;
+                gist.controls.canvas = canvas;
+                gist.controls.context = canvas.getContext('2d');
+
+                gist.controls.labels.dt000 = labels.querySelector(`[data-type='0.0']`);
+                gist.controls.labels.dt025 = labels.querySelector(`[data-type='.25']`);
+                gist.controls.labels.dt050 = labels.querySelector(`[data-type='.50']`);
+                gist.controls.labels.dt075 = labels.querySelector(`[data-type='.75']`);
+                gist.controls.labels.dt100 = labels.querySelector(`[data-type='1.0']`);
+            }
+        },
+
+        colorset_verify: () => {
+
+            const length = gist.colorset.length;
+
+            if (length > 1)
+            {
+                for(let index = 0; index < length - 1; ++index)
+                {
+                    const prev = gist.colorset[index + 0];
+                    const next = gist.colorset[index + 1];
+
+                    if (prev.max != next.min || prev.func(prev.max, 0) != next.func(next.min, 0))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return length > 0;
+        },
+
+        create_colorset : (lower_value, upper_value) => {
+
+            if (!lower_value)
+            {
+                lower_value = 0
+            }
+
+            if (!upper_value)
+            {
+                upper_value = gist.data[gist.data.length - 1]
+            }
+
+            let x0 = 0;
+            let x1 = lower_value / gist.settings.step;
+            let x2 = upper_value / gist.settings.step;
+            let x3 = gist.data.length - 1;
+
+            if (x1 < 0) x1 = 0;
+            if (x2 < 0) x2 = x3;
+
+            // console.log('lower: ', lower_value, ' < ', gist.data[x1].y, ' at ', x1);
+            // console.log('upper: ', upper_value, ' < ', gist.data[x2].y, ' at ', x2);
+
+            let delta = x2 - x1;
+
+            gist.colorset = [
+
+                { min: x0, max: x1, func: (x, h) => `rgba(33, 33, 33, 0.5)` },
+                { min: x1, max: x2, func: (x, h) => `rgba(255, ${255 * (1.0 - (x - x1) / delta)}, 0, 1)` },
+                { min: x2, max: x3, func: (x, h) => `rgba(33, 33, 33, 0.5)` },
+            ];
+
+            gist.colorset.forEach( v => {
+
+                console.log(`min: ${v.min}, max: ${v.max}`);
+            })
+        },
+
+        clear: () => {
+            gist.controls.context.clearRect(0, 0, gist.settings.width, gist.settings.height);
+        },
+
+        draw: () => {
+
+            const rect = gist.controls.object.getBoundingClientRect();
+
+            gist.settings.width = rect.width;
+            //gist.settings.height = rect.height;
+
+            gist.controls.canvas.width = gist.settings.width;
+            gist.controls.canvas.height = gist.settings.height;
+
+            gist.clear();
+            gist.render();
+        },
+
+        render : () => {
+
+            let __max_y = gist.data[0].y
+
+            gist.data.forEach( dt => {
+                if (dt.y > __max_y)
+                {
+                    __max_y = dt.y
+                }
+            });
+
+            const max_y = __max_y;
+
+            const min_x = gist.settings.min_x;
+            const max_x = gist.settings.max_x;
+
+            const width = gist.settings.width;
+            const height = gist.settings.height;
+
+            const length = gist.data.length;
+            const dims = Math.max(width, gist.settings.dimensions)
+
+            const scale_x = width / (max_x - min_x);
+            const scale_y = height / max_y;
+            
+            const yy = 0;
+            const ww = width / dims + 2.5;
+
+            let index = 0;
+
+            gist.colorset.forEach(color => {
+                for(;index < length && color.min <= gist.data[index].x && gist.data[index].x < color.max; ++index)
+                {
+                    const x = gist.data[index].x - min_x;
+                    const h = gist.data[index].y;
+
+                    const xx = scale_x * x;
+                    const hh = scale_y * h + 5;
+
+                    gist.controls.context.beginPath()
+                
+                    gist.controls.context.fillStyle = color.func(x,h);
+                    
+                    gist.controls.context.fillRect(xx, height - yy, ww, -hh);
+
+                    gist.controls.context.fillStyle = 'black';
+                    gist.controls.context.fillRect(xx, height - hh, ww, 1);
+    
+                    gist.controls.context.closePath()
+                }   
+            });
+        },
+
+        request : () => {
+            app.synch.send('onGetGist', undefined);
+        },
+
+        setup_gist_controls : (gctrl = app.modules.gctrl) => {
+
+            gctrl.set_lower_bound(gist.settings.min_y, false);
+            gctrl.set_upper_bound(gist.settings.max_y, false);
+
+            let delta = gist.settings.max_y - gist.settings.min_y
+
+            gist.controls.labels.dt000.innerHTML = (delta * 0.0).toFixed(2);
+            gist.controls.labels.dt025.innerHTML = (delta * .25).toFixed(2);
+            gist.controls.labels.dt050.innerHTML = (delta * .50).toFixed(2);
+            gist.controls.labels.dt075.innerHTML = (delta * .75).toFixed(2);
+            gist.controls.labels.dt100.innerHTML = (delta * 1.0).toFixed(2);
+        },
+
+        load : {
+
+            from_json_string : jsonstr => {
+                
+                gist.data = [];
+
+                console.log(jsonstr)
+
+                let data = JSON.parse(jsonstr);
+                let  min = data.min;
+                let  max = data.max;
+                    data = data.data;
+
+                let step = (max - min) / data.length;
+                
+                data.forEach((v, k) => !isNaN(v) && gist.data.push({ x : k, y : v }));
+
+                gist.settings.min_x = 0;
+                gist.settings.max_x = gist.data.length - 1;
+
+                gist.settings.min_y = min;
+                gist.settings.max_y = max;
+                gist.settings.step  = step;
+
+                gist.draw()
+            }
+        }
+    };
+
+    return gist;
+}
+
+
+function gist_control(app)
+{
+    let options = {
+
+        controls : {
+            lower : {},
+            upper : {}
+        },
+
+        init : () => {
+            options.controls.lower = document.querySelector('#lower_input');
+            options.controls.upper = document.querySelector('#upper_input');
+        },
+
+        set_lower_bound : (value = options.controls.lower.value, send_request = true) => {
+            value = parseFloat(`${value}`);
+
+            options.controls.lower.value = value;
+
+            app.synch.send('onSetLowerBound', value);
+
+            let vl = parseFloat(`${options.controls.lower.value}`)
+            let vu = parseFloat(`${options.controls.upper.value}`)
+
+            //console.log('set lower', value);
+            
+            app.modules.gist.create_colorset(vl,vu);
+
+            if (send_request)
+            {
+                app.modules.view.request();
+            }
+            
+            app.modules.gist.draw();
+        },
+
+        set_upper_bound : (value = options.controls.upper.value, send_request = true) => {
+
+            value = parseFloat(`${value}`);
+
+            options.controls.upper.value = value;
+
+            app.synch.send('onSetUpperBound', value);
+            
+            let vl = parseFloat(`${options.controls.lower.value}`)
+            let vu = parseFloat(`${options.controls.upper.value}`)
+            
+            app.modules.gist.create_colorset(vl,vu);
+
+            if (send_request)
+            {
+                app.modules.view.request();
+            }
+
+            app.modules.gist.draw();
+        },
+
+
+    }
+    
+    return options;
+}
+
+function View(app)
+{
+    let view = {
+
+        controls : {
+            z_input : {},
+            l_input : {},
+            canvas  : {},
+            context : {}
+        },
+
+        init : () => {
+
+            const canvas = document.getElementById('canvas');
+            const l_input = document.getElementById('l-index');
+            const z_input = document.getElementById('z-index');
+
+            console.assert(canvas)
+            console.assert(l_input)
+            console.assert(z_input)
+
+            if (canvas)
+            {
+                view.controls.canvas = canvas;
+                view.controls.context = canvas.getContext('2d');
+            }
+
+            if (l_input)
+            {
+                view.controls.l_input = l_input;
+            }
+
+            if (z_input)
+            {
+                view.controls.z_input = z_input;
+            }
+        },
+
+        request : () => {
+            app.synch.send('onBinary', new Uint8Array(1));
+        },
+
+        set_z_index : () => {
+
+            let value = parseInt(`${view.controls.z_input.value}`);
+
+            app.synch.send('onSetZ', value);
+        },
+        
+        set_l_index : () => {
+            
+            let value = parseInt(`${view.controls.l_input.value}`);
+
+            app.synch.send('onSetL', value);
+        },
+
+        load : {
+
+            from_binary : (array_buffer, type = 'image/bmp') => {
+                var img = new Image();
+
+                img.onload = () => {
+                    view.controls.context.drawImage(img, 0, 0);
+                };
+
+                const promise = new Promise((resolve, reject) => {
+                    resolve(new Blob([array_buffer], { type }))
+                });
+
+                promise.then(blob => img.src = URL.createObjectURL(blob));
+            }
+        }
+    };
+
+    return view;
+}
+
+function App()
+{
+    let app = {
+
+        controls : { },
+
+        modules : {
+            gist : {},
+            view : {},
+            gctrl : {}
+        },
+
+        events : {
+
+            resize : () => {
+
+            }
+
+        },
+
+        synch : {
+            send : (command, content) => {
+                Module.sendData({ command, content })
+            },
+
+            recv : (command, content) => {
+
+                console.log(command)
+
+                switch(command)
+                {
+                    case 'onBinary': app.modules.view.load.from_binary(new Uint8Array(content).buffer); break;
+                    case 'onString': /* writeToScreen('<span style="color: blue;">RESPONSE: ' + content + '</span>'); */; break;
+                    case 'onGetGist': app.modules.gist.load.from_json_string(content); break;
+                }
+            },
+        },
+
+        init : () => {
+
+            app.modules.gist = Gist(app);
+            app.modules.view = View(app);
+            app.modules.gctrl = gist_control(app);
+
+            app.modules.gist.init();
+            app.modules.view.init();
+            app.modules.gctrl.init();
+
+            if (Module)
+            {
+                Module.setReceiveData(msg => app.synch.recv(msg.command, msg.content));
+            }
+
+            app.modules.gist.request();
+
+            setTimeout(() => {
+                app.modules.gist.setup_gist_controls()
+                app.modules.view.request();
+            }, 100)
+        },
+
+        
+    };
+
+    return app;
+}
+
+var __app = App();
+
+try { Module; } catch(e) { var Module; }
+
+window.addEventListener('load', __app.init, false);
+
+</script>
 </html>

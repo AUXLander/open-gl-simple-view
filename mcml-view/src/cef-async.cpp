@@ -61,25 +61,39 @@ struct OpenGLClient : public MinimalClient
 		std::cout << "OpenGL " << GLVersion.major << "." << GLVersion.minor << '\n';
 
 		ex.init(800, 800);
-
-		ex.set_file("D:\\BINARY_DATA.BIN");
-
-		ex.load_binary();
 	}
 
-	void draw()
+	void draw(const model& m)
 	{
 		glfwMakeContextCurrent(window);
 
 		glfwPollEvents();
 
-		ex.select_current_z_index(148);
-
 		ex.invalidate_frame();
 
-		ex.DrawTexture();
+		ex.DrawTexture(m);
 
 		glfwSwapBuffers(window);
+	}
+
+	void set_lower_bound(float v)
+	{
+		ex.set_lower_bound(v);
+	}
+
+	void set_upper_bound(float v)
+	{
+		ex.set_upper_bound(v);
+	}
+
+	void set_z_index(size_t index)
+	{
+		ex.set_z_index(index);
+	}
+
+	void set_l_index(size_t index)
+	{
+		ex.set_l_index(index);
 	}
 };
 
@@ -140,6 +154,16 @@ int main(int argc, char* argv[])
 			}
 		);
 
+		__renderer->register_callback(
+			"onGetGist",
+			[](auto& package, auto args) {
+
+				auto string = CefV8Value::CreateString(args->GetString(0).ToString());
+
+				package->SetValue("content", string, cef_v8_propertyattribute_t::V8_PROPERTY_ATTRIBUTE_NONE);
+			}
+		);
+
 		// use nullptr for other process types
 		app = __renderer;
 	}
@@ -157,17 +181,25 @@ int main(int argc, char* argv[])
 	settings.no_sandbox = true;
 #endif
 
+
+
 	CefInitialize(args, settings, nullptr, windowsSandboxInfo);
 
 	CefWindowInfo windowInfo;
 
 #if defined(_WIN32)
 	// On Windows we need to specify certain flags that will be passed to CreateWindowEx().
-	windowInfo.SetAsPopup(NULL, "simple view");
+	windowInfo.SetAsPopup(NULL, "Monte Carlo Visualizer");
 #endif
+
+	windowInfo.width = 1400;
+	windowInfo.height = 1100;
+
 	CefBrowserSettings browserSettings;
 
 	auto client = OpenGLClient::CreateBrowserSync(windowInfo, URL, browserSettings, nullptr, nullptr);
+
+	filemodel fm("D:\\binary_sample_random.bin");
 
 	client->register_callback<std::string>(
 		// name of method to bind
@@ -189,6 +221,100 @@ int main(int argc, char* argv[])
 		}
 	);
 
+	client->register_callback<bool>(
+		// name of method to bind
+		"onGetGist",
+
+		// function to process strings
+		[&client, &fm](CefRefPtr<CefProcessMessage> msg, bool) -> void {
+
+			std::string data = fm.gist(0);
+
+
+
+			msg->GetArgumentList()->SetString(0, data);
+		
+			client->send(msg);
+		},
+
+		// function to resolve argument lists
+		[&client](auto arglist) -> bool { return true; }
+	);
+
+	client->register_callback<bool>(
+		// name of method to bind
+		"onSetLowerBound",
+
+		// function to process strings
+		[&client](CefRefPtr<CefProcessMessage> msg, bool) -> void {},
+
+		// function to resolve argument lists
+		[&client](auto arglist) -> bool {
+			double value = arglist->GetDouble(0);
+
+			client->set_lower_bound(value);
+
+			return true;
+		}
+	);
+
+	client->register_callback<bool>(
+		// name of method to bind
+		"onSetUpperBound",
+
+		// function to process strings
+		[&client](CefRefPtr<CefProcessMessage> msg, bool) -> void {},
+
+		// function to resolve argument lists
+		[&client](auto arglist) -> bool {
+
+			double value = arglist->GetDouble(0);
+
+			client->set_upper_bound(value);
+
+			return true;
+		}
+	);
+
+
+	client->register_callback<bool>(
+		// name of method to bind
+		"onSetZ",
+
+		// function to process strings
+		[&client](CefRefPtr<CefProcessMessage> msg, bool) -> void {},
+
+		// function to resolve argument lists
+		[&client](auto arglist) -> bool {
+
+			double value = arglist->GetInt(0);
+
+			client->set_z_index(value);
+
+			return true;
+		}
+	);
+
+
+	client->register_callback<bool>(
+		// name of method to bind
+		"onSetL",
+
+		// function to process strings
+		[&client](CefRefPtr<CefProcessMessage> msg, bool) -> void {},
+
+		// function to resolve argument lists
+		[&client](auto arglist) -> bool {
+
+			double value = arglist->GetInt(0);
+
+			client->set_l_index(value);
+
+			return true;
+		}
+	);
+
+
 	client->register_callback<std::pair<uint8_t*, size_t>>(
 		// name of method to bind
 		"onBinary",
@@ -209,15 +335,14 @@ int main(int argc, char* argv[])
 		},
 
 		// function to resolve argument lists
-		[&client](auto arglist) -> std::pair<uint8_t*, size_t> {
+		[&client, &fm](auto arglist) -> std::pair<uint8_t*, size_t> {
 
 			auto binary = arglist->GetBinary(0);
 			auto size = arglist->GetSize();
 
-
 			//binary->GetData(buf.data.get(), size, 0);
 
-			client->draw();
+			client->draw(fm);
 
 			uint8_t * p = client->ex.get_texture();
 			size_t s = 54 + client->ex.get_texture_size();

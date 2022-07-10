@@ -49,6 +49,26 @@ void receiveData(jsbind::local v)
 			CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
 		}
 	}
+	else if (!command.compare("onSetUpperBound") || !command.compare("onSetLowerBound"))
+	{
+		auto content = v["content"].as<double>();
+
+		arg->SetDouble(0, content);
+
+		CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+	}
+	else if (!command.compare("onGetGist"))
+	{
+		CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+	}	 
+	else if (!command.compare("onSetZ") || !command.compare("onSetL"))
+	{
+		auto content = v["content"].as<int>();
+
+		arg->SetInt(0, content);
+
+		CefV8Context::GetCurrentContext()->GetFrame()->SendProcessMessage(PID_BROWSER, msg);
+	}
 }
 
 JSBIND_BINDINGS(App)

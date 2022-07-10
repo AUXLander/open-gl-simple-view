@@ -39,23 +39,14 @@ int zmain(void)
             std::cout << "Render device: " << glGetString(GL_RENDERER) << '\n';
             std::cout << "OpenGL " << GLVersion.major << "." << GLVersion.minor << '\n';
 
+            filemodel fm("D:\\binary_sample_random.bin");
+
             ex.init(800, 800);
 
-            ex.set_file("D:\\BINARY_DATA.BIN");
-
-            ex.load_binary();
 
             glClearColor(1, 1, 1, 1);
 
-            auto timepoint = std::chrono::system_clock::now() + std::chrono::milliseconds(200);
-
-            size_t z_index = 148;
-
-            //ex.selected_layers[0] = false;
-            //ex.selected_layers[1] = false;
-            //ex.selected_layers[2] = false;
-            //ex.selected_layers[3] = false;
-            //ex.selected_layers[4] = true;
+            auto ctime = std::chrono::system_clock::now() + std::chrono::milliseconds(200);
 
             /* Loop until the user closes the window */
             while (!glfwWindowShouldClose(window))
@@ -63,16 +54,16 @@ int zmain(void)
                 /* Poll for and process events */
                 glfwPollEvents();
 
-                if (std::chrono::system_clock::now() >= timepoint)
+                if (std::chrono::system_clock::now() >= ctime)
                 {
-                    ex.invalidate_frame();
+                    // ex.invalidate_frame();
 
-                    ex.select_current_z_index(z_index++);
+                    // ex.select_current_z_index(z_index++);
 
-                    timepoint = std::chrono::system_clock::now() + std::chrono::milliseconds(200);
+                    // ctime = std::chrono::system_clock::now() + std::chrono::milliseconds(200);
                 }
 
-                ex.DrawTexture();
+                ex.DrawTexture(fm);
 
                 /* Swap front and back buffers */
                 glfwSwapBuffers(window);

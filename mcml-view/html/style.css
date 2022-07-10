@@ -20,7 +20,7 @@ body {
 
 .layview__laytabs 
 {
-    
+    overflow-y: hidden;
 }
 
 .layview .layview__vbody
@@ -38,6 +38,10 @@ body {
 
 .laytabs__tab
 {
+    display: flex;
+    align-items: center;
+    justify-content: left;
+
     min-width: 100px;
     max-width: 300px;
 
@@ -46,6 +50,14 @@ body {
     background: white;
 
     z-index: 0;
+}
+
+.laytabs__add
+{
+    padding: 10px;
+    user-select: none;
+
+    cursor: pointer;
 }
 
 .laytabs__tab.active 
@@ -180,7 +192,7 @@ body {
 {
     display: flex;
     margin-bottom: 8px;
-    
+    overflow: hidden;
 }
 
 .gist__ctrl
@@ -193,6 +205,26 @@ body {
     margin: 0 -15px;
 }
 
+.gist__labels
+{
+    display: flex;
+    flex-direction: row;
+
+    justify-content: space-between;
+
+    margin: 5px 0;
+}
+
+.gist__labels label
+{
+    margin: 0;
+    font-size: 10px;
+
+    color: black;
+
+    transform: rotateZ(-15deg) translateY(-7px) translateX(4px);
+}
+
 .gist__ctrl-element
 {
     margin: 0 15px;
@@ -200,7 +232,7 @@ body {
 
 .gist__ctrl-element.gist__ctrl-element_param
 {
-    max-width: 3.3em;
+    max-width: 5.7em;
     text-align: center;
 }
 

@@ -14,6 +14,8 @@
 #include <chrono>
 #include <optional>
 
+#include <iostream>
+
 #include <fstream>
 
 //#define URI_ROOT "http://localhost:8000"
@@ -184,6 +186,8 @@ private:
 
 		auto it = __cbstorage.find(name);
 		bool found = false;
+
+		std::cerr << "name: " << name << '\n';
 
 		while (it != __cbstorage.end() && it->first == name)
 		{
