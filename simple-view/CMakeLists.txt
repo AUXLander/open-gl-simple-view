@@ -61,6 +61,7 @@ add_executable(cef-async
     src/cef/client.hpp
     src/cef/render.hpp
     src/cef/types.hpp
+
     src/cef-async.cpp
     ${UTILS_SOURCES}
     ${CEF_CMAKE_EXECUTABLE_RESOURCES}

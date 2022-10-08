@@ -39,6 +39,10 @@ add_executable(${PROJECT_NAME}
                src/main.cpp 
                src/gl_draw.h 
                src/mcml_types.h
+
+               ${EXTERNALS_SOURCE_DIR}/dpcpp-mcml/src/common/iofile.hpp
+               ${EXTERNALS_SOURCE_DIR}/dpcpp-mcml/src/common/matrix.hpp
+               ${EXTERNALS_SOURCE_DIR}/dpcpp-mcml/src/common/pipe.hpp
                
                src/cef/client.hpp
                src/cef/render.hpp

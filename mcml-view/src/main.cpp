@@ -39,7 +39,7 @@ int zmain(void)
             std::cout << "Render device: " << glGetString(GL_RENDERER) << '\n';
             std::cout << "OpenGL " << GLVersion.major << "." << GLVersion.minor << '\n';
 
-            filemodel fm("D:\\binary_sample_random.bin");
+            filemodel fm("F:\\UserData\\Documents\\snapshot-2022_10_08-17_53_45.bin");
 
             ex.init(800, 800);
 

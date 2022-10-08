@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
 
 	auto client = OpenGLClient::CreateBrowserSync(windowInfo, URL, browserSettings, nullptr, nullptr);
 
-	filemodel fm("D:\\binary_sample_random.bin");
+	filemodel fm("F:\\UserData\\Documents\\snapshot-2022_10_08-17_53_45.bin");
 
 	client->register_callback<std::string>(
 		// name of method to bind

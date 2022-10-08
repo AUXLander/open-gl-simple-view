@@ -10,3 +10,6 @@
 [submodule "external/CImg"]
 	path = external/CImg
 	url = https://github.com/dtschump/CImg.git
+[submodule "external/dpcpp-mcml"]
+	path = external/dpcpp-mcml
+	url = https://github.com/AUXLander/dpcpp-mcml.git

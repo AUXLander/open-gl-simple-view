@@ -14,80 +14,82 @@
 #include <string>
 #include "CImg.h"
 #include "mcml_types.h"
+#include "../dpcpp-mcml/src/common/iofile.hpp"
+#include "../dpcpp-mcml/src/common/matrix.hpp"
 
 namespace CIMG = cimg_library;
 
-struct pixel
+struct pixel_rgb
 {
     uint8_t r{ 255 };
     uint8_t g{ 255 };
     uint8_t b{ 255 };
 
-    uint8_t a{ 255 };
+    pixel_rgb() = default;
 
-    pixel() = default;
-
-    pixel(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) :
-        r{r}, g{g}, b{b}, a{ a }
+    pixel_rgb(uint8_t r, uint8_t g, uint8_t b) :
+        r{ r }, g{ g }, b{ b }
     {;}
 };
 
+struct pixel_rgba : public pixel_rgb
+{
+    uint8_t a{ 255 };
+
+    pixel_rgba() = default;
+
+    pixel_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) :
+        pixel_rgb{ r, g, b}, a{a}
+    {;}
+};
+
+using pixel = pixel_rgba;
+
 struct model
 {
-    std::deque<std::deque<float>> __matrix;
+    const raw_memory_matrix_view<float>& matrix_view;
 
-    short num_layers = 0;
-    long  num_photons = 0;
+    model(raw_memory_matrix_view<float>& matrix_view) :
+        matrix_view{ matrix_view }
+    {;}
 
-    double max_x = 0;
-    double max_y = 0;
-    double max_z = 0;
-
-    double min_x = 0;
-    double min_y = 0;
-    double min_z = 0;
-
-    // dots per line
-    size_t dpl_x = 0;
-    size_t dpl_y = 0;
-    size_t dpl_z = 0;
-    size_t dpl_l = 0;
-
-    // dots per point
-
-    size_t dpp_x = 0;
-    size_t dpp_y = 0;
-    size_t dpp_z = 0;
-    size_t dpp_l = 0;
-
-    std::string gist(size_t layer_idx, size_t resolution = 100) const
+    std::string gist(size_t layer_index, size_t resolution = 100) const
     {
-        auto &matrix = __matrix[layer_idx];
-
         std::string        result;
-        std::vector<float> data(resolution, 0.f);
+        std::vector<float> gist(resolution, 0.f);
 
-        float min = static_cast<float>(matrix[0]);
-        float max = static_cast<float>(matrix[0]);
+        float min = matrix_view.at(0, 0, 0, layer_index);
+        float max = matrix_view.at(0, 0, 0, layer_index);
 
-        for (const auto v : matrix)
+        for (size_t z = 0; z < matrix_view.properties.size_z(); ++z)
         {
-            min = std::min(min, v);
-            max = std::max(max, v);
+            for (size_t y = 0; y < matrix_view.properties.size_y(); ++y)
+            {
+                for (size_t x = 0; x < matrix_view.properties.size_x(); ++x)
+                {
+                    min = std::min(min, matrix_view.at(x, y, z, layer_index));
+                    max = std::max(max, matrix_view.at(x, y, z, layer_index));
+                }
+            }
         }
 
-        //data.front() = count of max;
-        //data.back()  = count of min;
-        const auto maxind = data.size() - 1;
+        const auto maxind = gist.size() - 1U;
         const auto step = (max - min) / maxind;
 
-        for (const auto v : matrix)
+        for (size_t z = 0; z < matrix_view.properties.size_z(); ++z)
         {
-            const auto index = static_cast<size_t>((v - min) / step);
-
-            if (index < data.size())
+            for (size_t y = 0; y < matrix_view.properties.size_y(); ++y)
             {
-                data[index] += 1;
+                for (size_t x = 0; x < matrix_view.properties.size_x(); ++x)
+                {
+                    const auto value = matrix_view.at(x, y, z, layer_index);
+                    const auto index = static_cast<size_t>((value - min) / step);
+
+                    if (index < gist.size())
+                    {
+                        gist[index] += 1;
+                    }
+                }
             }
         }
 
@@ -102,7 +104,7 @@ struct model
 
         result += "{\"min\":" + format(min) + ",\"max\":" + format(max) + ",\"data\":[";
 
-        for (const auto v : data)
+        for (const auto v : gist)
         {
             result += format(v);
             result += ',';
@@ -113,178 +115,46 @@ struct model
 
         return result;
     }
-
 };
 
 class filemodel : public model
 {
-    constexpr static auto readmode  = std::ios_base::binary | std::ios_base::in;
-    constexpr static auto writemode = std::ios_base::binary | std::ios_base::out;
-
-    struct fstream_deleter
-    {
-        void operator()(std::fstream* s)
-        {
-            assert(s);
-            s->close();
-            delete s;
-        }
-    };
-
-    std::unique_ptr<std::fstream, fstream_deleter>  __file;
+    memory_matrix_view<float> __matrix;
 
 public:
 
     filemodel()
-    {}
+        : model{ __matrix }
+    {;}
 
-    filemodel(const char* filename)
+    filemodel(const char* path)
+        : model{ __matrix }
     {
-        //this->save(filename);
-        this->load(filename);
+        assert(path);
+
+        auto file = iofile::open(path, std::ios_base::in);
+
+        iofile::import_file(__matrix, file);
     }
 
-    void load(const char* filename)
+    void import_file(iofile::file_handler& file)
     {
-        __file.reset(new std::fstream{ filename, readmode });
-
-        __file->read((char*)&num_layers, sizeof(num_layers));
-        __file->read((char*)&num_photons, sizeof(num_photons));
-
-        __file->read((char*)&dpl_x, sizeof(dpl_x));
-        __file->read((char*)&dpl_y, sizeof(dpl_y));
-        __file->read((char*)&dpl_z, sizeof(dpl_z));
-        __file->read((char*)&dpl_l, sizeof(dpl_z));
-
-        __file->read((char*)&min_x, sizeof(min_x));
-        __file->read((char*)&min_y, sizeof(min_y));
-        __file->read((char*)&min_z, sizeof(min_z));
-
-        __file->read((char*)&max_x, sizeof(max_x));
-        __file->read((char*)&max_y, sizeof(max_y));
-        __file->read((char*)&max_z, sizeof(max_z));
-
-        dpp_x = 1U;
-        dpp_y = dpl_x * dpp_x;
-        dpp_z = dpl_y * dpp_y;
-        dpp_l = dpl_z * dpp_z;
-
-        for (short layer_idx = 0; layer_idx < num_layers; ++layer_idx)
-        {
-            std::deque<float> data(dpp_l, 0.f);
-
-            float value = 0;
-            size_t index = 0;
-
-            for (size_t z_index = 0; z_index < dpl_z; ++z_index)
-            {
-                for (size_t y_index = 0; y_index < dpl_y; ++y_index)
-                {
-                    for (size_t x_index = 0; x_index < dpl_x; ++x_index, ++index)
-                    {
-                        __file->read((char*)&value, sizeof(value));
-
-                        data[index] = static_cast<float>(value);
-                    }
-                }
-            }
-
-            __matrix.emplace_back(std::move(data));
-        }
+        iofile::import_file(__matrix, file);
     }
 
-    void save(const char* filename)
+    void export_file(iofile::file_handler& file) const
     {
-        __file.reset(new std::fstream{ filename, writemode });
-
-        std::random_device rd;
-        std::mt19937 gen{ rd() };
-        std::normal_distribution<> ndist(0, 1.0);
-
-        /// TEST DATA BEGIN
-
-        num_layers = 5;
-        num_photons = 102400;
-
-        dpl_x = 100;
-        dpl_y = 100;
-        dpl_z = 100;
-        dpl_l = num_layers;
-
-        min_x = 0;
-        min_y = 0;
-        min_z = 0;
-
-        max_x = 1;
-        max_y = 1;
-        max_z = 1;
-
-        /// TEST DATA END
-
-        __file->write((char*)&num_layers, sizeof(num_layers));
-        __file->write((char*)&num_photons, sizeof(num_photons));
-
-        __file->write((char*)&dpl_x, sizeof(dpl_x));
-        __file->write((char*)&dpl_y, sizeof(dpl_y));
-        __file->write((char*)&dpl_z, sizeof(dpl_z));
-        __file->write((char*)&dpl_l, sizeof(dpl_z));
-
-        __file->write((char*)&min_x, sizeof(min_x));
-        __file->write((char*)&min_y, sizeof(min_y));
-        __file->write((char*)&min_z, sizeof(min_z));
-
-        __file->write((char*)&max_x, sizeof(max_x));
-        __file->write((char*)&max_y, sizeof(max_y));
-        __file->write((char*)&max_z, sizeof(max_z));
-
-        for (short l_index = 0; l_index < num_layers; ++l_index)
-        {
-            //const std::deque<float>& data = __matrix[layer_idx];
-
-            size_t index = 0;
-
-            for (size_t z_index = 0; z_index < dpl_z; ++z_index)
-            {
-                for (size_t y_index = 0; y_index < dpl_y; ++y_index)
-                {
-                    for (size_t x_index = 0; x_index < dpl_x; ++x_index, ++index)
-                    {
-                        //__file->write((char*)&data[index], sizeof(data[index]));
-
-                        const auto fy = 1.f - std::fabs(int(y_index) - int(dpl_y / 2)) / (float)(dpl_y / 2);
-                        const auto fx = 1.f - std::fabs(int(x_index) - int(dpl_x / 2)) / (float)(dpl_x / 2);
-
-                        const float value = 3000.0f * fy * fx * std::fabs(ndist(gen));
-
-                        __file->write((char*)&value, sizeof(value));
-                    }
-                }
-            }
-        }
-
-        __file->flush();
-        __file->close();
+        iofile::export_file(__matrix, file);
     }
 };
 
 class explorer
 {
-    constexpr static auto readmode = std::ios_base::binary | std::ios_base::in;
-
-    struct fstream_deleter
-    {
-        void operator()(std::fstream* s)
-        {
-            assert(s);
-            s->close();
-            delete s;
-        }
-    };
-
-    std::unique_ptr<pixel[]> __texture_draw;
-    GLuint                   __texture_id;
+    constexpr static size_t BMP_HEADER_SIZE = 54U;
 
     std::unique_ptr<uint8_t[]> __texture_save;
+    std::unique_ptr<pixel[]>   __texture_draw;
+    GLuint                     __texture_id;
 
     size_t selected_z_index = 0;
     size_t selected_l_index = 0;
@@ -349,12 +219,12 @@ public:
 
     uint8_t* get_texture()
     {
-        return (uint8_t*)__texture_save.get();
+        return reinterpret_cast<uint8_t*>(__texture_save.get());
     }
 
-    size_t get_texture_size()
+    size_t get_texture_size() const noexcept
     {
-        return 54 + 3 * view_width * view_height;
+        return BMP_HEADER_SIZE + sizeof(pixel_rgb) * view_width * view_height;
     }
 
     void init(int ViewWidth, int ViewHeight)
@@ -402,44 +272,25 @@ public:
 
         glBegin(GL_POINTS);
 
-        size_t index = 0;
-
-        size_t l_index = 0;
-        size_t z_index = 0;
+        size_t l_index = selected_l_index;
+        size_t z_index = selected_z_index;
         size_t y_index = 0;
         size_t x_index = 0;
 
-        frame_width = m.dpl_x;
-        frame_height = m.dpl_y;
+        frame_width = m.matrix_view.properties.size_x();
+        frame_height = m.matrix_view.properties.size_y();
 
-        const auto& matrix = m.__matrix[l_index];
-
-        if (selected_l_index)
+        // for (;l_index < m.matrix_view.properties.size_l(); ++l_index)
         {
-            l_index = selected_l_index % m.dpl_l;
-            index += m.dpp_l * l_index;
-        }
-
-        if (selected_z_index)
-        {
-            z_index = selected_z_index % m.dpl_z;
-            index += m.dpp_z * z_index;
-        }
-
-        //for (;l_index < m.num_layers; ++l_index)
-        {
-            // for (; z_index < m.dpl_z; ++z_index)
+            // for (; z_index < m.matrix_view.properties.size_z(); ++z_index)
             {
-                for (y_index = 0; y_index < m.dpl_y; ++y_index)
+                for (y_index = 0; y_index < m.matrix_view.properties.size_y(); ++y_index)
                 {
-                    for (x_index = 0; x_index < m.dpl_x; ++x_index, ++index)
+                    for (x_index = 0; x_index < m.matrix_view.properties.size_x(); ++x_index)
                     {
-                        const int x = static_cast<int>(x_index);
-                        const int y = static_cast<int>(y_index);
-                        
-                        set_color(matrix[index]);
+                        set_color(m.matrix_view.at(x_index, y_index, z_index, l_index));
 
-                        glVertex2i(x, y);
+                        glVertex2i(static_cast<int>(x_index), static_cast<int>(y_index));
                     }
                 }
             }
@@ -460,7 +311,7 @@ public:
         {
             if (!__texture_save)
             {
-                __texture_save.reset(new uint8_t[54 + 3 * view_width * view_height]{ 0 });
+                __texture_save.reset(new uint8_t[get_texture_size()]{0});
             }
 
             CIMG::CImg<uint8_t> image((const char*)__texture_draw.get(), 4, frame_width, frame_height, 1);
@@ -537,8 +388,9 @@ public:
 
             if constexpr (true)
             {
-                std::fstream file("new.bmp", std::ios_base::binary | std::ios_base::out);
-                file.write((const char*)__texture_save.get(), 54 + 3 * view_width * view_height);
+                auto file = iofile::open("new.bmp", std::ios_base::out);
+
+                pipe_utils::save_raw_data(*file, (const char*)__texture_save.get(), get_texture_size());
             }
         }
     }
