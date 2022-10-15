@@ -61,11 +61,13 @@ struct model
         float min = matrix_view.at(0, 0, 0, layer_index);
         float max = matrix_view.at(0, 0, 0, layer_index);
 
-        for (size_t z = 0; z < matrix_view.properties.size_z(); ++z)
+        const auto [size_x, size_y, size_z, size_l] = matrix_view.properties().size();
+
+        for (size_t z = 0; z < size_z; ++z)
         {
-            for (size_t y = 0; y < matrix_view.properties.size_y(); ++y)
+            for (size_t y = 0; y < size_y; ++y)
             {
-                for (size_t x = 0; x < matrix_view.properties.size_x(); ++x)
+                for (size_t x = 0; x < size_x; ++x)
                 {
                     min = std::min(min, matrix_view.at(x, y, z, layer_index));
                     max = std::max(max, matrix_view.at(x, y, z, layer_index));
@@ -76,11 +78,11 @@ struct model
         const auto maxind = gist.size() - 1U;
         const auto step = (max - min) / maxind;
 
-        for (size_t z = 0; z < matrix_view.properties.size_z(); ++z)
+        for (size_t z = 0; z < size_z; ++z)
         {
-            for (size_t y = 0; y < matrix_view.properties.size_y(); ++y)
+            for (size_t y = 0; y < size_y; ++y)
             {
-                for (size_t x = 0; x < matrix_view.properties.size_x(); ++x)
+                for (size_t x = 0; x < size_x; ++x)
                 {
                     const auto value = matrix_view.at(x, y, z, layer_index);
                     const auto index = static_cast<size_t>((value - min) / step);
@@ -97,12 +99,12 @@ struct model
             [](float v)
             {
                 auto str = std::to_string(v);
-                str = str.substr(0, str.find(".") + 3);
+                str = str.substr(0, str.find(".") + 4);
                 
                 return str;
             };
 
-        result += "{\"min\":" + format(min) + ",\"max\":" + format(max) + ",\"data\":[";
+        result += "{\"min\":" + format(min) + ",\"max\":" + format(max) + ",\"step\":" + format(step) + ",\"data\":[";
 
         for (const auto v : gist)
         {
@@ -156,10 +158,7 @@ class explorer
     std::unique_ptr<pixel[]>   __texture_draw;
     GLuint                     __texture_id;
 
-    size_t selected_z_index = 0;
-    size_t selected_l_index = 0;
-
-    bool is_frame_invalidated{ true };
+    bool is_frame_invalidated { true };
 
     void load_texture()
     {
@@ -182,31 +181,6 @@ class explorer
 
             glDisable(target);
         }
-    }
-
-    float lower_bound = 0.0;
-    float upper_bound = 1.0;
-
-    void set_color(float value)
-    {
-        float g = 0;
-        float a = 0;
-
-        if (value < lower_bound)
-        {
-            a = 0;
-        }
-        else if (value > upper_bound)
-        {
-            a = 1;
-        }
-        else
-        {
-            a = (value - lower_bound) / (upper_bound - lower_bound);
-            g = (1.0f - a);
-        }
-
-        glColor4f(1.0, g, 0, a);
     }
 
 public:
@@ -244,61 +218,8 @@ public:
         is_frame_invalidated = true;
     }
 
-    void set_z_index(size_t index)
+    void save_texture()
     {
-        selected_z_index = index;
-    }
-
-    void set_l_index(size_t index)
-    {
-        selected_l_index = index;
-    }
-
-    void set_lower_bound(float lower)
-    {
-        lower_bound = lower;
-    }
-    void set_upper_bound(float upper)
-    {
-        upper_bound = upper;
-    }
-
-    void render_frame(const model& m)
-    {
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_BLEND);
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glBegin(GL_POINTS);
-
-        size_t l_index = selected_l_index;
-        size_t z_index = selected_z_index;
-        size_t y_index = 0;
-        size_t x_index = 0;
-
-        frame_width = m.matrix_view.properties.size_x();
-        frame_height = m.matrix_view.properties.size_y();
-
-        // for (;l_index < m.matrix_view.properties.size_l(); ++l_index)
-        {
-            // for (; z_index < m.matrix_view.properties.size_z(); ++z_index)
-            {
-                for (y_index = 0; y_index < m.matrix_view.properties.size_y(); ++y_index)
-                {
-                    for (x_index = 0; x_index < m.matrix_view.properties.size_x(); ++x_index)
-                    {
-                        set_color(m.matrix_view.at(x_index, y_index, z_index, l_index));
-
-                        glVertex2i(static_cast<int>(x_index), static_cast<int>(y_index));
-                    }
-                }
-            }
-        }
-
-        glDisable(GL_BLEND);
-        glEnd();
-
         // save texture
         if (!__texture_draw)
         {
@@ -395,11 +316,33 @@ public:
         }
     }
 
-    void DrawTexture(const model& m)
+    template<class Trenderer>
+    void render_frame(Trenderer& render, const model& m)
+    {
+        const auto [size_x, size_y, size_z, size_l] = m.matrix_view.properties().size();
+
+        frame_width = size_x;
+        frame_height = size_y;
+
+        render.render(*this, m);
+
+        // buffering
+        if (!__texture_draw)
+        {
+            __texture_draw.reset(new pixel[frame_width * frame_height]);
+        }
+
+        glReadPixels(0, 0, frame_width, frame_height, GL_RGBA, GL_UNSIGNED_BYTE, __texture_draw.get());
+    }
+
+    template<class Trenderer>
+    void draw_texture(Trenderer& render, const model& m)
     {
         if (is_frame_invalidated)
         {
-            render_frame(m);
+            glClearColor(1, 1, 1, 1);
+
+            render_frame(render, m);
             load_texture();
 
             is_frame_invalidated = false;
@@ -429,5 +372,165 @@ public:
         glEnd();
 
         glDisable(GL_TEXTURE_2D);
+    }
+};
+
+struct render
+{
+    float lower_bound = 0.0;
+    float upper_bound = 1.0;
+
+    size_t selected_l_index = 0;
+
+    bool mode_projection = false;
+
+    void set_color(float value)
+    {
+        float g = 0;
+        float a = 0;
+
+        if (value < lower_bound)
+        {
+            a = 0;
+        }
+        else if (value > upper_bound)
+        {
+            a = 1;
+        }
+        else
+        {
+            a = (value - lower_bound) / (upper_bound - lower_bound);
+            g = (1.0f - a);
+        }
+
+        glColor4f(1.0, g, 0, a);
+    }
+
+    void set_lower_bound(float lower)
+    {
+        lower_bound = lower;
+    }
+
+    void set_upper_bound(float upper)
+    {
+        upper_bound = upper;
+    }
+
+    void set_layer_index(size_t l_index)
+    {
+        selected_l_index = l_index;
+    }
+
+    void set_enable_projection(bool enable)
+    {
+        mode_projection = enable;
+    }
+};
+
+struct render_xy : public render
+{
+    size_t selected_z_index = 0;
+
+    void render(const explorer& exp, const model& m)
+    {
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glBegin(GL_POINTS);
+
+        const auto [size_x, size_y, size_z, size_l] = m.matrix_view.properties().size();
+
+        for (size_t y_index = 0; y_index < size_y; ++y_index)
+        {
+            for (size_t x_index = 0; x_index < size_x; ++x_index)
+            {
+                float val = 0;
+
+                if (mode_projection)
+                {
+                    for (size_t z_index = 0; z_index < size_z; ++z_index)
+                    {
+                        val += m.matrix_view.at(x_index, y_index, z_index, selected_l_index);
+                    }
+                }
+                else
+                {
+                    val = m.matrix_view.at(x_index, y_index, selected_z_index, selected_l_index);
+                }
+
+                set_color(val);
+
+                glVertex2i(static_cast<int>(x_index), static_cast<int>(y_index));
+            }
+        }
+
+        glDisable(GL_BLEND);
+        glEnd();
+    }
+
+    void set_depth_index(size_t index)
+    {
+        selected_z_index = index;
+    }
+
+    static const char* name()
+    {
+        return "Oxy";
+    }
+};
+
+struct render_xz : public render
+{
+    size_t selected_y_index = 0;
+
+    void render(const explorer& exp, const model& m)
+    {
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glBegin(GL_POINTS);
+
+        const auto [size_x, size_y, size_z, size_l] = m.matrix_view.properties().size();
+
+        for (size_t z_index = 0; z_index < size_z; ++z_index)
+        {
+            for (size_t x_index = 0; x_index < size_x; ++x_index)
+            {
+                float val = 0;
+
+                if (mode_projection)
+                {
+                    for (size_t y_index = 0; y_index < size_y; ++y_index)
+                    {
+                        val += m.matrix_view.at(x_index, y_index, z_index, selected_l_index);
+                    }
+                }
+                else
+                {
+                    val = m.matrix_view.at(x_index, selected_y_index, z_index, selected_l_index);
+                }
+
+                set_color(val);
+
+                glVertex2i(static_cast<int>(x_index), static_cast<int>(z_index));
+            }
+        }
+
+        glDisable(GL_BLEND);
+        glEnd();
+    }
+
+    void set_depth_index(size_t index)
+    {
+        selected_y_index = index;
+    }
+
+    static const char* name()
+    {
+        return "Oxz";
     }
 };

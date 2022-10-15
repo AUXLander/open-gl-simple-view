@@ -20,6 +20,8 @@ struct OpenGLClient : public MinimalClient
 {
 	GLFWwindow* window;
 
+	render_xy renderer;
+
 	explorer ex;
 
 	static CefRefPtr<OpenGLClient> CreateBrowserSync(const CefWindowInfo& windowInfo, const CefString& url, const CefBrowserSettings& settings, CefRefPtr<CefDictionaryValue> extra_info, CefRefPtr<CefRequestContext> request_context)
@@ -71,34 +73,34 @@ struct OpenGLClient : public MinimalClient
 
 		ex.invalidate_frame();
 
-		ex.DrawTexture(m);
+		ex.draw_texture(renderer, m);
 
 		glfwSwapBuffers(window);
 	}
 
 	void set_lower_bound(float v)
 	{
-		ex.set_lower_bound(v);
+		renderer.set_lower_bound(v);
 	}
 
 	void set_upper_bound(float v)
 	{
-		ex.set_upper_bound(v);
+		renderer.set_upper_bound(v);
 	}
 
 	void set_z_index(size_t index)
 	{
-		ex.set_z_index(index);
+		//ex.set_z_index(index);
 	}
 
 	void set_l_index(size_t index)
 	{
-		ex.set_l_index(index);
+		//ex.set_l_index(index);
 	}
 };
 
 
-int main(int argc, char* argv[])
+int vmain(int argc, char* argv[])
 {
 	CefRefPtr<CefCommandLine> commandLine = CefCommandLine::CreateCommandLine();
 #if defined(_WIN32)
@@ -199,7 +201,7 @@ int main(int argc, char* argv[])
 
 	auto client = OpenGLClient::CreateBrowserSync(windowInfo, URL, browserSettings, nullptr, nullptr);
 
-	filemodel fm("F:\\UserData\\Documents\\snapshot-2022_10_08-17_53_45.bin");
+	filemodel fm("D:\\snapshot-2022_10_15-15_12_51.bin");
 
 	client->register_callback<std::string>(
 		// name of method to bind
@@ -228,7 +230,7 @@ int main(int argc, char* argv[])
 		// function to process strings
 		[&client, &fm](CefRefPtr<CefProcessMessage> msg, bool) -> void {
 
-			std::string data = fm.gist(0);
+			std::string data = fm.gist(1);
 
 
 
